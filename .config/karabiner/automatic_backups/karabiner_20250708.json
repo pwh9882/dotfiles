@@ -1151,27 +1151,6 @@
       "complex_modifications": {
         "rules": [
           {
-            "description": "Right Option to Ctrl+A for WezTerm",
-            "manipulators": [
-              {
-                "conditions": [
-                  {
-                    "bundle_identifiers": ["^com\\.github\\.wez\\.wezterm$"],
-                    "type": "frontmost_application_if"
-                  }
-                ],
-                "from": { "key_code": "right_option" },
-                "to": [
-                  {
-                    "key_code": "a",
-                    "modifiers": "control"
-                  }
-                ],
-                "type": "basic"
-              }
-            ]
-          },
-          {
             "description": "Changed hjkl to arrow keys and Others",
             "manipulators": [
               {
@@ -1523,6 +1502,31 @@
                 },
                 "to": [{ "key_code": "f18" }],
                 "type": "basic"
+              },
+              {
+                "description": "Right Option to Ctrl+A for WezTerm",
+                "manipulators": [
+                  {
+                    "conditions": [
+                      {
+                        "bundle_identifiers": [
+                          "^com\\.github\\.wez\\.wezterm$"
+                        ],
+                        "type": "frontmost_application_if"
+                      }
+                    ],
+                    "from": {
+                      "key_code": "right_option"
+                    },
+                    "to": [
+                      {
+                        "key_code": "a",
+                        "modifiers": "control"
+                      }
+                    ],
+                    "type": "basic"
+                  }
+                ]
               }
             ]
           }
