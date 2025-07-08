@@ -53,3 +53,30 @@ When making changes:
 - Configuration files are in `.config/` subdirectories
 - Each tool's init script should be idempotent
 - WezTerm and Neovim configurations are highly customized with specific plugin dependencies
+
+## Security Guidelines
+
+**CRITICAL**: This repository contains sensitive development environments. Follow these security practices:
+
+### Files to NEVER Commit
+- **`.config/zed/conversations/`** - Contains AI assistant conversations with potential API tokens, personal projects, and sensitive development discussions
+- Any files containing API keys, tokens, or credentials
+- Personal project data, proprietary code snippets, or confidential information
+- Temporary files with sensitive output or debugging information
+
+### Git Safety Practices
+- Always review `git status` and `git diff` before committing
+- Use `.gitignore` to exclude sensitive directories (already configured for Zed conversations)
+- If sensitive data is accidentally committed, immediately:
+  1. Stop any pending pushes
+  2. Reset git history to before the problematic commit
+  3. Selectively re-commit only safe files
+  4. Force push the cleaned history
+
+### Repository Maintenance
+- Regularly audit `.gitignore` for completeness
+- Be especially careful with editor conversation/history files
+- Consider using `git secrets` or similar tools for additional protection
+- Remember: Once pushed to GitHub, sensitive data requires history rewriting to fully remove
+
+**Note**: A previous incident involved accidentally committing Zed conversations containing Docker and GitHub Personal Access Tokens, requiring complete git history cleanup. This configuration helps prevent similar issues.
