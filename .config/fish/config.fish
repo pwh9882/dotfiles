@@ -12,4 +12,3 @@ if test -f /Users/woohyeok/micromamba/bin/conda
     eval /Users/woohyeok/micromamba/bin/conda "shell.fish" "hook" $argv | source
 end
 # <<< conda initialize <<<
-
