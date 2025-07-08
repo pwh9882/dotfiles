@@ -100,7 +100,7 @@ fish_style_pwd_dir_length = 0  # 전체 디렉토리명 표시
 [git_branch]
 symbol = ""  # 더 현대적인 브랜치 아이콘
 style = "bold green"
-format = "on [$symbol $branch]($style)"
+format = "on [$symbol $branch]($style) "
 truncation_length = 25
 truncation_symbol = "…"
 
