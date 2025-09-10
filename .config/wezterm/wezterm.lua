@@ -497,6 +497,17 @@ wezterm.on("smart_workspace_switcher.workspace_switcher.start", function(window)
     resurrect.state_manager.save_state(workspace_state.get_workspace_state(), current_workspace)
     resurrect.state_manager.write_current_state(current_workspace, "workspace")
     wezterm.log_info("Workspace switcher started, saved state for: " .. current_workspace)
+
+    -- Record the current project/workspace into recent list for the project picker
+    local tab = window:active_tab()
+    if tab then
+        local pane = tab:active_pane()
+        if pane and projects and projects.record_current_as_recent then
+            pcall(function()
+                projects.record_current_as_recent(pane)
+            end)
+        end
+    end
 end)
 
 -- Log canceled event
