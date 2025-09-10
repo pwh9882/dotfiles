@@ -7,36 +7,30 @@
 // custom settings, run the `open default settings` command
 // from the command palette or from `Zed` application menu.
 {
-  "agent_servers": {
-    "codex": {
-      "command": "codex",
-      "args": [""],
-      "env": {}
-    },
-    "claude": {
-      "command": "claude",
-      "args": [""],
-      "env": {}
-    }
-  },
   "ssh_connections": [
     {
       "host": "cosmos-test-whpark",
       "projects": [
         {
-          "paths": ["/home/ec2-user/development"]
+          "paths": [
+            "/home/ec2-user/development"
+          ]
         },
         {
-          "paths": ["/home/ec2-user/development/cosmos"]
+          "paths": [
+            "/home/ec2-user/development/cosmos"
+          ]
         },
         {
-          "paths": ["/home/ec2-user/development/cosmos/__pycache__"]
+          "paths": [
+            "/home/ec2-user/development/cosmos/__pycache__"
+          ]
         }
       ]
     }
   ],
   "icon_theme": "Catppuccin Latte",
-  "agent": {
+  "assistant": {
     "profiles": {
       "test": {
         "name": "test",
@@ -49,7 +43,8 @@
     "default_model": {
       "provider": "zed.dev",
       "model": "claude-sonnet-4-thinking"
-    }
+    },
+    "version": "2"
   },
   "vim_mode": false,
   "features": {

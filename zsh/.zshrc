@@ -149,10 +149,9 @@ alias v="nvim"
 alias ls="lsd"
 alias ll="ls -alhF"
 alias tf="terraform"
-alias cm="claude-monitor"
-alias cc="claude"
+alias cld="claude"
 alias gd="cd '/Users/woohyeok/Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드라이브'"
-
+alias ytd='yt-dlp --cookies-from-browser safari -f "bv*[height<=1080][vcodec^=avc1][ext=mp4]+ba[ext=m4a]/mp4" -o "%(title)s.%(ext)s"'
 source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 
 # autojump removed in favor of zoxide
@@ -177,3 +176,6 @@ eval "$(zoxide init zsh)"
 alias j="z"
 
 . "$HOME/.local/bin/env"
+
+
+[[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
