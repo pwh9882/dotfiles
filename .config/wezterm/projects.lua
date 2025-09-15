@@ -45,7 +45,9 @@ local additional_dirs = {
     wezterm.home_dir .. "/Documents",
     wezterm.home_dir .. "/Desktop",
     wezterm.home_dir .. "/mcps",
-    wezterm.home_dir .. "/Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드라이브/GD2025-01/UCI"
+    wezterm.home_dir .. "/Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드라이브/GD2025-01/UCI",
+    wezterm.home_dir .. "/Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드라이브/GD2025-02/석사수업/ANLP",
+    wezterm.home_dir .. "/Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드라이브/GD2025-02/석사수업/DCD"
   }
 
 -- Function to parse SSH config and extract host names
