@@ -341,6 +341,11 @@ config.keys = {
                 })
         end),
     },
+    {
+        key="Enter", 
+        mods="SHIFT", 
+        action=wezterm.action{SendString="\x1b\r"}
+    },
 }
 
 
@@ -574,7 +579,7 @@ config.ssh_domains = {
     },
 
     -- If true, connect to this domain automatically at startup
-    -- connect_automatically = true,
+    connect_automatically = false,
 
     -- Specify an alternative read timeout
     -- timeout = 60,
@@ -583,6 +588,28 @@ config.ssh_domains = {
     -- Primarily useful if it isn't installed in the $PATH
     -- that is configure for ssh.
     -- remote_wezterm_path = "/home/yourusername/bin/wezterm"
+  },  {
+    name = 'ddps0',
+    remote_address = 'srv2.ddps.cloud:33022',
+    username = 'whpark',
+    ssh_option = {
+      identityfile = '~/.ssh/ddps-srv-1_ed25519',
+      
+    },
+    connect_automatically = false,
+  },
+  {
+    name = 'norm',
+    remote_address = 'normalize.duckdns.org',
+    ssh_option = {
+            identityfile = '/Users/woohyeok/local/oracleA1/ssh-key-2024-09-04.key',
+        },
+    username = 'ubuntu' 
+  },{
+    name = 'mini-ts',
+    remote_address = '100.74.23.65',
+    username = 'woohyeok',
+    remote_wezterm_path = '/opt/homebrew/bin/wezterm'
   },
 }
 

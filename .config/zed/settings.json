@@ -47,8 +47,8 @@
     },
     "default_profile": "write",
     "default_model": {
-      "provider": "zed.dev",
-      "model": "claude-sonnet-4-thinking"
+      "provider": "google",
+      "model": "gemini-2.5-pro"
     }
   },
   "vim_mode": false,

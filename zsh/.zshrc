@@ -163,7 +163,7 @@ ulimit -n 1048575
 DEFAULT_USER=woohyeok
 export AWS_PROFILE=ddpslab
 
-conda activate uci
+conda activate titans
 
 
 # starship for custom prompt for shell
