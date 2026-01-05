@@ -610,7 +610,12 @@ config.ssh_domains = {
     remote_address = '100.74.23.65',
     username = 'woohyeok',
     remote_wezterm_path = '/opt/homebrew/bin/wezterm'
+  },{
+    name = 'uci-gpu',
+    remote_address = '100.114.244.128',
+    username = 'hyunwooo',
   },
+
 }
 
 

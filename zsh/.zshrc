@@ -179,3 +179,6 @@ alias j="z"
 
 
 [[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
+
+# Added by Antigravity
+export PATH="/Users/woohyeok/.antigravity/antigravity/bin:$PATH"

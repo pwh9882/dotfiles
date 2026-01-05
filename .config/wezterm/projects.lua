@@ -41,6 +41,7 @@ local project_dir_years = {
   }
 -- Additional common project directories
 local additional_dirs = {
+    wezterm.home_dir .. "/AndroidStudioProjects/Zon",
     wezterm.home_dir .. "/dotfiles",
     wezterm.home_dir .. "/Documents",
     wezterm.home_dir .. "/Desktop",
