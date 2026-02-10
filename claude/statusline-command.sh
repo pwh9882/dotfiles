@@ -174,6 +174,6 @@ printf '%b\n' "${OVERLAY}${SESSION_ID}${RESET}"
 
 # === Line 3: last prompt (width-aware) ===
 if [ -n "$LAST_PROMPT" ]; then
-    LAST_PROMPT=$(truncate "$LAST_PROMPT" "$MAX_WIDTH")
+    LAST_PROMPT=$(truncate "$LAST_PROMPT" "$((MAX_WIDTH - 10))")
     printf '%b\n' "${MAUVE}${LAST_PROMPT}${RESET}"
 fi
