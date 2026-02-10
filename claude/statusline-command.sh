@@ -60,15 +60,15 @@ case "$(uname -s)" in
             _DISTRO=$(. /etc/os-release && printf '%s' "$ID")
         fi
         case "$_DISTRO" in
-            ubuntu)  OS_ICON=$'\uf31b' ;;
-            debian)  OS_ICON=$'\uf306' ;;
-            fedora)  OS_ICON=$'\uf30a' ;;
-            arch)    OS_ICON=$'\uf303' ;;
-            *)       OS_ICON=$'\uf17c' ;;
+            ubuntu)  OS_ICON=$'\xef\x8c\x9b' ;;
+            debian)  OS_ICON=$'\xef\x8c\x86' ;;
+            fedora)  OS_ICON=$'\xef\x8c\x8a' ;;
+            arch)    OS_ICON=$'\xef\x8c\x83' ;;
+            *)       OS_ICON=$'\xef\x85\xbc' ;;
         esac
         ;;
-    Darwin*) OS_ICON=$'\U000f0035' ;;
-    *)       OS_ICON=$'\uf108' ;;
+    Darwin*) OS_ICON=$'\xf3\xb0\x80\xb5' ;;
+    *)       OS_ICON=$'\xef\x84\x88' ;;
 esac
 
 # --- Directory ---
