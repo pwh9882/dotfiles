@@ -53,6 +53,24 @@ file_age() {
     echo $(( $(date +%s) - mtime ))
 }
 
+# --- OS icon ---
+case "$(uname -s)" in
+    Linux*)
+        if [ -f /etc/os-release ]; then
+            _DISTRO=$(. /etc/os-release && printf '%s' "$ID")
+        fi
+        case "$_DISTRO" in
+            ubuntu)  OS_ICON=$'\uf31b' ;;
+            debian)  OS_ICON=$'\uf306' ;;
+            fedora)  OS_ICON=$'\uf30a' ;;
+            arch)    OS_ICON=$'\uf303' ;;
+            *)       OS_ICON=$'\uf17c' ;;
+        esac
+        ;;
+    Darwin*) OS_ICON=$'\U000f0035' ;;
+    *)       OS_ICON=$'\uf108' ;;
+esac
+
 # --- Directory ---
 DIR="$CWD"
 [[ "$DIR" == "$HOME"* ]] && DIR="󰋜${DIR#$HOME}"
@@ -141,25 +159,33 @@ if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
 fi
 
 # === Line 1: status info (width-aware, drop items from right if too wide) ===
-# Full:    "Opus 4.6 │ ctx 15% │ +34 -16 │ fc45a2a"
-# Compact: "Opus 4.6 │ ctx 15% │ +34 -16"
+# Full:    "Opus 4.6 │ ctx 15% │ +34 -16 │ main +1 !2 #42 │ fc45a2a"
+# Compact: "Opus 4.6 │ ctx 15% │ +34 -16 │ main +1 !2 #42"
+# Minimal: "Opus 4.6 │ ctx 15% │ +34 -16"
+GIT_PLAIN="${BRANCH}${STATUS_STR}${PR_NUM:+ #$PR_NUM}"
 L1_CORE="${MODEL_NAME} | ctx ${CTX_USED}% | +${LINES_ADDED} -${LINES_REMOVED}"
-L1_FULL="${L1_CORE} | ${SESSION_ID:0:7}"
+L1_WITH_GIT="${L1_CORE}${GIT_PLAIN:+ | $GIT_PLAIN}"
+L1_FULL="${L1_WITH_GIT} | ${SESSION_ID:0:7}"
+
+GIT_FORMATTED="${GREEN}${BRANCH}${RESET}${GIT_STATUS}${PR_DISPLAY}"
+DIFF_PART="${GREEN}+${LINES_ADDED}${RESET} ${RED}-${LINES_REMOVED}${RESET}"
 
 if [ "${#L1_FULL}" -le "$MAX_WIDTH" ]; then
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${GREEN}+${LINES_ADDED}${RESET} ${RED}-${LINES_REMOVED}${RESET} ${SEP} ${OVERLAY}${SESSION_ID:0:7}${RESET}"
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${DIFF_PART}${GIT_PLAIN:+ ${SEP} ${GIT_FORMATTED}} ${SEP} ${OVERLAY}${SESSION_ID:0:7}${RESET}"
+elif [ "${#L1_WITH_GIT}" -le "$MAX_WIDTH" ]; then
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${DIFF_PART}${GIT_PLAIN:+ ${SEP} ${GIT_FORMATTED}}"
 else
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${GREEN}+${LINES_ADDED}${RESET} ${RED}-${LINES_REMOVED}${RESET}"
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${DIFF_PART}"
 fi
 
-# === Line 2: location, git, PR, prompt (width-aware) ===
-LINE2_BASE_PLAIN="X in ${DIR}${BRANCH:+ on $BRANCH}${STATUS_STR:+ $STATUS_STR}${PR_NUM:+ #$PR_NUM}"
+# === Line 2: location, prompt (width-aware) ===
+LINE2_BASE_PLAIN="X in ${DIR}"
 LINE2_BASE_LEN=${#LINE2_BASE_PLAIN}
 
 PROMPT_MAX=$(( MAX_WIDTH - LINE2_BASE_LEN - 3 ))
 if [ "$PROMPT_MAX" -ge 10 ] && [ -n "$LAST_PROMPT" ]; then
     LAST_PROMPT=$(truncate "$LAST_PROMPT" "$PROMPT_MAX")
-    printf '%b\n' "${LAVENDER}󰀵${RESET} in ${SAPPHIRE}${DIR}${RESET}${GIT_BRANCH}${PR_DISPLAY}${GIT_STATUS}${STYLE_INDICATOR} ${OVERLAY}│ ${MAUVE}${LAST_PROMPT}${RESET}"
+    printf '%b\n' "${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${STYLE_INDICATOR} ${OVERLAY}│ ${MAUVE}${LAST_PROMPT}${RESET}"
 else
-    printf '%b\n' "${LAVENDER}󰀵${RESET} in ${SAPPHIRE}${DIR}${RESET}${GIT_BRANCH}${PR_DISPLAY}${GIT_STATUS}${STYLE_INDICATOR}"
+    printf '%b\n' "${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${STYLE_INDICATOR}"
 fi
