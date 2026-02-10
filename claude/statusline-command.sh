@@ -10,8 +10,8 @@ INPUT=$(cat)
 
 TERM_WIDTH=$(stty size < /dev/tty 2>/dev/null | awk '{print $2}')
 TERM_WIDTH=${TERM_WIDTH:-80}
-# Reserve right side for Claude Code notifications (updates, MCP errors, token warnings)
-MAX_WIDTH=$(( TERM_WIDTH / 2 ))
+# Reserve ~25% right side for Claude Code notifications (updates, MCP errors, token warnings)
+MAX_WIDTH=$(( TERM_WIDTH * 75 / 100 ))
 
 # --- Parse JSON (single jq call) ---
 eval $(printf '%s' "$INPUT" | jq -r '
@@ -159,23 +159,23 @@ if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
 fi
 
 # === Line 1: status info (width-aware, drop items from right if too wide) ===
-# Full:    "Opus 4.6 │ ctx 15% │ +34 -16 │ main +1 !2 #42 │ fc45a2a"
-# Compact: "Opus 4.6 │ ctx 15% │ +34 -16 │ main +1 !2 #42"
-# Minimal: "Opus 4.6 │ ctx 15% │ +34 -16"
+# Full:    "Opus 4.6 │ ctx 15% │ fc45a2ae-... │ +34 -16 │ main +1 !2 #42"
+# Compact: "Opus 4.6 │ ctx 15% │ fc45a2ae-... │ +34 -16"
+# Minimal: "Opus 4.6 │ ctx 15% │ fc45a2ae-..."
 GIT_PLAIN="${BRANCH}${STATUS_STR}${PR_NUM:+ #$PR_NUM}"
-L1_CORE="${MODEL_NAME} | ctx ${CTX_USED}% | +${LINES_ADDED} -${LINES_REMOVED}"
+L1_CORE="${MODEL_NAME} | ctx ${CTX_USED}% | ${SESSION_ID} | +${LINES_ADDED} -${LINES_REMOVED}"
 L1_WITH_GIT="${L1_CORE}${GIT_PLAIN:+ | $GIT_PLAIN}"
-L1_FULL="${L1_WITH_GIT} | ${SESSION_ID:0:7}"
 
 GIT_FORMATTED="${GREEN}${BRANCH}${RESET}${GIT_STATUS}${PR_DISPLAY}"
 DIFF_PART="${GREEN}+${LINES_ADDED}${RESET} ${RED}-${LINES_REMOVED}${RESET}"
+SID_PART="${OVERLAY}${SESSION_ID}${RESET}"
 
-if [ "${#L1_FULL}" -le "$MAX_WIDTH" ]; then
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${DIFF_PART}${GIT_PLAIN:+ ${SEP} ${GIT_FORMATTED}} ${SEP} ${OVERLAY}${SESSION_ID:0:7}${RESET}"
-elif [ "${#L1_WITH_GIT}" -le "$MAX_WIDTH" ]; then
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${DIFF_PART}${GIT_PLAIN:+ ${SEP} ${GIT_FORMATTED}}"
+if [ "${#L1_WITH_GIT}" -le "$MAX_WIDTH" ]; then
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${SID_PART} ${SEP} ${DIFF_PART}${GIT_PLAIN:+ ${SEP} ${GIT_FORMATTED}}"
+elif [ "${#L1_CORE}" -le "$MAX_WIDTH" ]; then
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${SID_PART} ${SEP} ${DIFF_PART}"
 else
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${DIFF_PART}"
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${SID_PART}"
 fi
 
 # === Line 2: location, prompt (width-aware) ===
