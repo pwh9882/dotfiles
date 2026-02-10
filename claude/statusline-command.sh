@@ -10,8 +10,8 @@ INPUT=$(cat)
 
 TERM_WIDTH=$(stty size < /dev/tty 2>/dev/null | awk '{print $2}')
 TERM_WIDTH=${TERM_WIDTH:-80}
-# Reserve ~25% right side for Claude Code notifications (updates, MCP errors, token warnings)
-MAX_WIDTH=$(( TERM_WIDTH * 75 / 100 ))
+# Reserve ~35% right side for Claude Code notifications (updates, MCP errors, token warnings)
+MAX_WIDTH=$(( TERM_WIDTH * 65 / 100 ))
 
 # --- Parse JSON (single jq call) ---
 eval $(printf '%s' "$INPUT" | jq -r '
@@ -158,34 +158,30 @@ if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
     ' 2>/dev/null | grep -v '^$' | tail -1)
 fi
 
-# === Line 1: status info (width-aware, drop items from right if too wide) ===
-# Full:    "Opus 4.6 │ ctx 15% │ fc45a2ae-... │ +34 -16 │ main +1 !2 #42"
-# Compact: "Opus 4.6 │ ctx 15% │ fc45a2ae-... │ +34 -16"
-# Minimal: "Opus 4.6 │ ctx 15% │ fc45a2ae-..."
-GIT_PLAIN="${BRANCH}${STATUS_STR}${PR_NUM:+ #$PR_NUM}"
-L1_CORE="${MODEL_NAME} | ctx ${CTX_USED}% | ${SESSION_ID} | +${LINES_ADDED} -${LINES_REMOVED}"
-L1_WITH_GIT="${L1_CORE}${GIT_PLAIN:+ | $GIT_PLAIN}"
-
-GIT_FORMATTED="${GREEN}${BRANCH}${RESET}${GIT_STATUS}${PR_DISPLAY}"
+# === Line 1: model, ctx, diff, path (65% width-aware) ===
 DIFF_PART="${GREEN}+${LINES_ADDED}${RESET} ${RED}-${LINES_REMOVED}${RESET}"
-SID_PART="${OVERLAY}${SESSION_ID}${RESET}"
 
-if [ "${#L1_WITH_GIT}" -le "$MAX_WIDTH" ]; then
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${SID_PART} ${SEP} ${DIFF_PART}${GIT_PLAIN:+ ${SEP} ${GIT_FORMATTED}}"
-elif [ "${#L1_CORE}" -le "$MAX_WIDTH" ]; then
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${SID_PART} ${SEP} ${DIFF_PART}"
+L1_CORE="${MODEL_NAME} | ctx ${CTX_USED}% | +${LINES_ADDED} -${LINES_REMOVED}"
+L1_WITH_DIR="${L1_CORE} | X in ${DIR}"
+
+if [ "${#L1_WITH_DIR}" -le "$MAX_WIDTH" ]; then
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${DIFF_PART} ${SEP} ${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${STYLE_INDICATOR}"
 else
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${SID_PART}"
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${DIFF_PART}"
 fi
 
-# === Line 2: location, prompt (width-aware) ===
-LINE2_BASE_PLAIN="X in ${DIR}"
-LINE2_BASE_LEN=${#LINE2_BASE_PLAIN}
+# === Line 2: session ID + git/PR ===
+GIT_FORMATTED="${GREEN}${BRANCH}${RESET}${GIT_STATUS}${PR_DISPLAY}"
+GIT_PLAIN="${BRANCH}${STATUS_STR}${PR_NUM:+ #$PR_NUM}"
 
-PROMPT_MAX=$(( MAX_WIDTH - LINE2_BASE_LEN - 3 ))
-if [ "$PROMPT_MAX" -ge 10 ] && [ -n "$LAST_PROMPT" ]; then
-    LAST_PROMPT=$(truncate "$LAST_PROMPT" "$PROMPT_MAX")
-    printf '%b\n' "${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${STYLE_INDICATOR} ${OVERLAY}│ ${MAUVE}${LAST_PROMPT}${RESET}"
+if [ -n "$GIT_PLAIN" ]; then
+    printf '%b\n' "${OVERLAY}${SESSION_ID}${RESET} ${SEP} ${GIT_FORMATTED}"
 else
-    printf '%b\n' "${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${STYLE_INDICATOR}"
+    printf '%b\n' "${OVERLAY}${SESSION_ID}${RESET}"
+fi
+
+# === Line 3: last prompt (width-aware) ===
+if [ -n "$LAST_PROMPT" ]; then
+    LAST_PROMPT=$(truncate "$LAST_PROMPT" "$MAX_WIDTH")
+    printf '%b\n' "${MAUVE}${LAST_PROMPT}${RESET}"
 fi
