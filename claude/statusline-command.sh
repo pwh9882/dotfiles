@@ -19,8 +19,6 @@ eval $(printf '%s' "$INPUT" | jq -r '
   "OUTPUT_STYLE=\(.output_style.name // "" | @sh)",
   "MODEL_NAME=\(.model.display_name // "" | @sh)",
   "CTX_USED=\(.context_window.used_percentage // 0)",
-  "LINES_ADDED=\(.cost.total_lines_added // 0)",
-  "LINES_REMOVED=\(.cost.total_lines_removed // 0)",
   "SESSION_ID=\(.session_id // "" | @sh)",
   "TRANSCRIPT=\(.transcript_path // "" | @sh)"
 ')
@@ -158,27 +156,21 @@ if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
     ' 2>/dev/null | grep -v '^$' | tail -1)
 fi
 
-# === Line 1: model, ctx, diff, path (65% width-aware) ===
-DIFF_PART="${GREEN}+${LINES_ADDED}${RESET} ${RED}-${LINES_REMOVED}${RESET}"
-
-L1_CORE="${MODEL_NAME} | ctx ${CTX_USED}% | +${LINES_ADDED} -${LINES_REMOVED}"
-L1_WITH_DIR="${L1_CORE} | X in ${DIR}"
-
-if [ "${#L1_WITH_DIR}" -le "$MAX_WIDTH" ]; then
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${DIFF_PART} ${SEP} ${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${STYLE_INDICATOR}"
-else
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${DIFF_PART}"
-fi
-
-# === Line 2: session ID + git/PR ===
+# === Line 1: model, ctx, git/PR, path (65% width-aware) ===
 GIT_FORMATTED="${GREEN}${BRANCH}${RESET}${GIT_STATUS}${PR_DISPLAY}"
 GIT_PLAIN="${BRANCH}${STATUS_STR}${PR_NUM:+ #$PR_NUM}"
 
-if [ -n "$GIT_PLAIN" ]; then
-    printf '%b\n' "${OVERLAY}${SESSION_ID}${RESET} ${SEP} ${GIT_FORMATTED}"
+L1_CORE="${MODEL_NAME} | ctx ${CTX_USED}%${GIT_PLAIN:+ | $GIT_PLAIN}"
+L1_WITH_DIR="${L1_CORE} | X in ${DIR}"
+
+if [ "${#L1_WITH_DIR}" -le "$MAX_WIDTH" ]; then
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET}${GIT_PLAIN:+ ${SEP} ${GIT_FORMATTED}} ${SEP} ${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${STYLE_INDICATOR}"
 else
-    printf '%b\n' "${OVERLAY}${SESSION_ID}${RESET}"
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET}${GIT_PLAIN:+ ${SEP} ${GIT_FORMATTED}}"
 fi
+
+# === Line 2: session ID ===
+printf '%b\n' "${OVERLAY}${SESSION_ID}${RESET}"
 
 # === Line 3: last prompt (width-aware) ===
 if [ -n "$LAST_PROMPT" ]; then
