@@ -1,18 +1,20 @@
 #!/bin/bash
 # Claude Code StatusLine - Starship-inspired with Catppuccin Mocha theme
-# Receives JSON from Claude Code with session information
+# Receives JSON from Claude Code via stdin
+# Dependencies: jq, git, gh (optional, for PR status)
 
-# Parse JSON input
+set -f  # Disable globbing for safety
+
+# --- Input & Terminal ---
 INPUT=$(cat)
 
-# Get real terminal width via /dev/tty (tput returns 80 default in pipe context)
 TERM_WIDTH=$(stty size < /dev/tty 2>/dev/null | awk '{print $2}')
 TERM_WIDTH=${TERM_WIDTH:-80}
-# Reserve ~40% for Claude Code's built-in right status
-MAX_WIDTH=$(( TERM_WIDTH * 60 / 100 ))
+# Reserve right side for Claude Code notifications (updates, MCP errors, token warnings)
+MAX_WIDTH=$(( TERM_WIDTH / 2 ))
 
-# Extract all values from JSON in a single jq call
-eval $(echo "$INPUT" | jq -r '
+# --- Parse JSON (single jq call) ---
+eval $(printf '%s' "$INPUT" | jq -r '
   "CWD=\(.cwd // "" | @sh)",
   "OUTPUT_STYLE=\(.output_style.name // "" | @sh)",
   "MODEL_NAME=\(.model.display_name // "" | @sh)",
@@ -23,7 +25,7 @@ eval $(echo "$INPUT" | jq -r '
   "TRANSCRIPT=\(.transcript_path // "" | @sh)"
 ')
 
-# Catppuccin Mocha colors (dimmed for status line)
+# --- Colors (Catppuccin Mocha, 256-color) ---
 MAUVE="\033[38;5;183m"
 YELLOW="\033[38;5;222m"
 SAPPHIRE="\033[38;5;116m"
@@ -32,79 +34,102 @@ RED="\033[38;5;210m"
 LAVENDER="\033[38;5;189m"
 OVERLAY="\033[38;5;245m"
 RESET="\033[0m"
+SEP="${OVERLAY}│${RESET}"
 
-# OS icon
-OS_ICON="󰀵"
+# --- Helpers ---
+truncate() {
+    local str="$1" max="$2"
+    if [ "${#str}" -gt "$max" ]; then
+        printf '%s' "${str:0:$((max - 1))}…"
+    else
+        printf '%s' "$str"
+    fi
+}
 
-# Format directory (replace home with icon, truncate if too long)
+# Cross-platform file age in seconds (macOS + Linux)
+file_age() {
+    local mtime
+    mtime=$(stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0)
+    echo $(( $(date +%s) - mtime ))
+}
+
+# --- Directory ---
 DIR="$CWD"
-if [[ "$DIR" == "$HOME"* ]]; then
-    DIR="󰋜${DIR#$HOME}"
-fi
+[[ "$DIR" == "$HOME"* ]] && DIR="󰋜${DIR#$HOME}"
+[ "${#DIR}" -gt 50 ] && DIR="…${DIR: -47}"
 
-# Truncate long paths
-if [[ ${#DIR} -gt 50 ]]; then
-    DIR="…${DIR: -47}"
-fi
+# --- Git (cached, 5s TTL) ---
+BRANCH="" STATUS_STR="" GIT_BRANCH="" GIT_STATUS="" PR_DISPLAY=""
 
-# Git info (use --no-optional-locks for performance)
-GIT_BRANCH=""
-GIT_STATUS=""
 if git -C "$CWD" rev-parse --git-dir > /dev/null 2>&1; then
-    # Get branch or commit
-    BRANCH=$(git -C "$CWD" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null || \
-             git -C "$CWD" --no-optional-locks rev-parse --short HEAD 2>/dev/null)
+    GIT_DIR=$(git -C "$CWD" rev-parse --git-dir 2>/dev/null)
+    CACHE_DIR="${GIT_DIR}/statusline-cache"
+    mkdir -p "$CACHE_DIR" 2>/dev/null
+
+    GIT_CACHE="${CACHE_DIR}/git"
+    PR_CACHE="${CACHE_DIR}/pr"
+
+    # Git status cache (5s TTL)
+    if [ ! -f "$GIT_CACHE" ] || [ "$(file_age "$GIT_CACHE")" -gt 5 ]; then
+        BRANCH=$(git -C "$CWD" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null || \
+                 git -C "$CWD" --no-optional-locks rev-parse --short HEAD 2>/dev/null)
+        if [ -n "$BRANCH" ]; then
+            STATUS=$(git -C "$CWD" --no-optional-locks status --porcelain 2>/dev/null)
+            STAGED=$(printf '%s' "$STATUS" | grep -c '^[MADRC]')
+            MODIFIED=$(printf '%s' "$STATUS" | grep -c '^ [MD]')
+            UNTRACKED=$(printf '%s' "$STATUS" | grep -c '^??')
+            printf '%s\n' "${BRANCH}|${STAGED}|${MODIFIED}|${UNTRACKED}" > "$GIT_CACHE"
+        else
+            printf '%s\n' "|||" > "$GIT_CACHE"
+        fi
+    fi
+    IFS='|' read -r BRANCH STAGED MODIFIED UNTRACKED < "$GIT_CACHE"
 
     if [ -n "$BRANCH" ]; then
         GIT_BRANCH=" on ${GREEN}${BRANCH}${RESET}"
 
-        # Get status counts
-        STATUS=$(git -C "$CWD" --no-optional-locks status --porcelain 2>/dev/null)
-        STAGED=$(echo "$STATUS" | grep -c '^[MADRC]')
-        MODIFIED=$(echo "$STATUS" | grep -c '^ [MD]')
-        UNTRACKED=$(echo "$STATUS" | grep -c '^??')
-
         STATUS_STR=""
-        [ "$STAGED" -gt 0 ] && STATUS_STR="${STATUS_STR}+${STAGED}"
-        [ "$MODIFIED" -gt 0 ] && STATUS_STR="${STATUS_STR} !${MODIFIED}"
-        [ "$UNTRACKED" -gt 0 ] && STATUS_STR="${STATUS_STR} ?${UNTRACKED}"
+        [ "${STAGED:-0}" -gt 0 ] && STATUS_STR="${STATUS_STR}+${STAGED}"
+        [ "${MODIFIED:-0}" -gt 0 ] && STATUS_STR="${STATUS_STR} !${MODIFIED}"
+        [ "${UNTRACKED:-0}" -gt 0 ] && STATUS_STR="${STATUS_STR} ?${UNTRACKED}"
+        [ -n "$STATUS_STR" ] && GIT_STATUS=" ${YELLOW}${STATUS_STR}${RESET}"
 
-        if [ -n "$STATUS_STR" ]; then
-            GIT_STATUS=" ${YELLOW}${STATUS_STR}${RESET}"
+        # PR status cache (60s TTL) - only if gh is available
+        if command -v gh > /dev/null 2>&1; then
+            if [ ! -f "$PR_CACHE" ] || [ "$(file_age "$PR_CACHE")" -gt 60 ]; then
+                PR_NUM=$(gh pr view --json number -q '.number' 2>/dev/null || echo "")
+                if [ -n "$PR_NUM" ]; then
+                    PR_STATE=$(gh pr checks --json name,state -q '[.[] | .state] | if all(. == "SUCCESS") then "ok" elif any(. == "FAILURE") then "fail" else "pending" end' 2>/dev/null || echo "")
+                    printf '%s\n' "${PR_NUM}|${PR_STATE}" > "$PR_CACHE"
+                else
+                    printf '%s\n' "|" > "$PR_CACHE"
+                fi
+            fi
+            IFS='|' read -r PR_NUM PR_STATE < "$PR_CACHE"
+
+            if [ -n "$PR_NUM" ]; then
+                case "$PR_STATE" in
+                    ok)      PR_DISPLAY=" ${GREEN}#${PR_NUM}${RESET}" ;;
+                    fail)    PR_DISPLAY=" ${RED}#${PR_NUM}${RESET}" ;;
+                    pending) PR_DISPLAY=" ${YELLOW}#${PR_NUM}${RESET}" ;;
+                    *)       PR_DISPLAY=" ${OVERLAY}#${PR_NUM}${RESET}" ;;
+                esac
+            fi
         fi
     fi
 fi
 
-# Output style indicator
+# --- Output style ---
 STYLE_INDICATOR=""
-if [ -n "$OUTPUT_STYLE" ] && [ "$OUTPUT_STYLE" != "default" ]; then
-    STYLE_INDICATOR=" [${OUTPUT_STYLE}]"
-fi
+[ -n "$OUTPUT_STYLE" ] && [ "$OUTPUT_STYLE" != "default" ] && STYLE_INDICATOR=" [${OUTPUT_STYLE}]"
 
-# Model name (already clean from display_name)
-MODEL_SHORT="$MODEL_NAME"
-
-# Context usage with color coding
+# --- Context usage (color-coded) ---
 CTX_INT=${CTX_USED%.*}
-if [ "$CTX_INT" -ge 90 ] 2>/dev/null; then
-    CTX_COLOR="$RED"
-elif [ "$CTX_INT" -ge 70 ] 2>/dev/null; then
-    CTX_COLOR="$YELLOW"
-else
-    CTX_COLOR="$GREEN"
-fi
-CTX_DISPLAY="${CTX_COLOR}${CTX_USED}%${RESET}"
+if [ "${CTX_INT:-0}" -ge 90 ] 2>/dev/null; then CTX_COLOR="$RED"
+elif [ "${CTX_INT:-0}" -ge 70 ] 2>/dev/null; then CTX_COLOR="$YELLOW"
+else CTX_COLOR="$GREEN"; fi
 
-# Lines added/removed
-LINES_DISPLAY="${GREEN}+${LINES_ADDED}${RESET} ${RED}-${LINES_REMOVED}${RESET}"
-
-# Session ID (shortened to first 7 chars)
-SESSION_SHORT=""
-if [ -n "$SESSION_ID" ]; then
-    SESSION_SHORT="${OVERLAY}${SESSION_ID:0:7}${RESET}"
-fi
-
-# Last user prompt from transcript
+# --- Last user prompt (from transcript, tail for performance) ---
 LAST_PROMPT=""
 if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
     LAST_PROMPT=$(tail -200 "$TRANSCRIPT" | grep '"type":"user"' | jq -r '
@@ -115,41 +140,26 @@ if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
     ' 2>/dev/null | grep -v '^$' | tail -1)
 fi
 
-# Helper: truncate a string with visible-length awareness (plain text, no ANSI)
-truncate() {
-    local str="$1" max="$2"
-    if [ ${#str} -gt "$max" ]; then
-        echo "${str:0:$((max - 3))}..."
-    else
-        echo "$str"
-    fi
-}
+# === Line 1: status info (width-aware, drop items from right if too wide) ===
+# Full:    "Opus 4.6 │ ctx 15% │ +34 -16 │ fc45a2a"
+# Compact: "Opus 4.6 │ ctx 15% │ +34 -16"
+L1_CORE="${MODEL_NAME} | ctx ${CTX_USED}% | +${LINES_ADDED} -${LINES_REMOVED}"
+L1_FULL="${L1_CORE} | ${SESSION_ID:0:7}"
 
-# Line 1: status info - build plain text to measure, then truncate components if needed
-LINE1_PLAIN="${MODEL_SHORT} │ ctx ${CTX_USED}% │ +${LINES_ADDED} -${LINES_REMOVED} │ ${SESSION_ID:0:7}"
-if [ ${#LINE1_PLAIN} -gt "$MAX_WIDTH" ]; then
-    # Line 1 is mostly fixed-width, just output as-is (unlikely to overflow)
-    :
+if [ "${#L1_FULL}" -le "$MAX_WIDTH" ]; then
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${GREEN}+${LINES_ADDED}${RESET} ${RED}-${LINES_REMOVED}${RESET} ${SEP} ${OVERLAY}${SESSION_ID:0:7}${RESET}"
+else
+    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET} ${SEP} ${GREEN}+${LINES_ADDED}${RESET} ${RED}-${LINES_REMOVED}${RESET}"
 fi
-echo -e "${MODEL_SHORT} ${OVERLAY}│${RESET} ctx ${CTX_DISPLAY} ${OVERLAY}│${RESET} ${LINES_DISPLAY} ${OVERLAY}│${RESET} ${SESSION_SHORT}"
 
-# Line 2: location & git + last prompt - dynamically allocate space
-# Measure path+git portion
-LINE2_BASE_PLAIN="X in ${DIR}"
-[ -n "$BRANCH" ] && LINE2_BASE_PLAIN="${LINE2_BASE_PLAIN} on ${BRANCH}${STATUS_STR:+ $STATUS_STR}"
+# === Line 2: location, git, PR, prompt (width-aware) ===
+LINE2_BASE_PLAIN="X in ${DIR}${BRANCH:+ on $BRANCH}${STATUS_STR:+ $STATUS_STR}${PR_NUM:+ #$PR_NUM}"
 LINE2_BASE_LEN=${#LINE2_BASE_PLAIN}
 
-# Remaining space for prompt (minus separator " │ ")
 PROMPT_MAX=$(( MAX_WIDTH - LINE2_BASE_LEN - 3 ))
-if [ "$PROMPT_MAX" -lt 10 ]; then
-    # Not enough space, skip prompt
-    LAST_PROMPT=""
-elif [ -n "$LAST_PROMPT" ]; then
+if [ "$PROMPT_MAX" -ge 10 ] && [ -n "$LAST_PROMPT" ]; then
     LAST_PROMPT=$(truncate "$LAST_PROMPT" "$PROMPT_MAX")
-fi
-
-if [ -n "$LAST_PROMPT" ]; then
-    echo -e "${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${GIT_BRANCH}${GIT_STATUS}${STYLE_INDICATOR} ${OVERLAY}│ ${MAUVE}${LAST_PROMPT}${RESET}"
+    printf '%b\n' "${LAVENDER}󰀵${RESET} in ${SAPPHIRE}${DIR}${RESET}${GIT_BRANCH}${PR_DISPLAY}${GIT_STATUS}${STYLE_INDICATOR} ${OVERLAY}│ ${MAUVE}${LAST_PROMPT}${RESET}"
 else
-    echo -e "${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${GIT_BRANCH}${GIT_STATUS}${STYLE_INDICATOR}"
+    printf '%b\n' "${LAVENDER}󰀵${RESET} in ${SAPPHIRE}${DIR}${RESET}${GIT_BRANCH}${PR_DISPLAY}${GIT_STATUS}${STYLE_INDICATOR}"
 fi
