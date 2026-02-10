@@ -6,6 +6,7 @@
 
 ### 🖥️ 터미널 & 셸
 - **[WezTerm](/.config/wezterm/)** - 고성능 터미널 (SSH workspace 통합, 세션 복원)
+- **[tmux](/tmux/)** - Oh My Tmux + Catppuccin Mocha 테마 + 세션 복원
 - **[Zsh](/zsh/)** - Oh-my-zsh + zoxide + 생산성 alias 모음
 - **[Starship](/.config/starship.toml)** - 아름다운 프롬프트 (Catppuccin Mocha 테마)
 
@@ -43,6 +44,7 @@ dotfiles/
 │   ├── nvim/         # Neovim 설정
 │   ├── zed/          # Zed 에디터 설정
 │   └── starship.toml # 프롬프트 설정
+├── tmux/             # tmux 설정 (Oh My Tmux)
 ├── zsh/              # Zsh 셸 설정
 ├── git/              # Git 설정
 └── init.sh           # 설치 스크립트
