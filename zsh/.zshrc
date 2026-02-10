@@ -51,5 +51,8 @@ eval "$(zoxide init zsh)"
 # True color support
 export COLORTERM=truecolor
 
+# ---- Secrets (gitignored, 기기별 민감 환경변수) ----
+[[ -f "$HOME/.zshenv.secrets" ]] && source "$HOME/.zshenv.secrets"
+
 # ---- Load machine-specific config ----
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
