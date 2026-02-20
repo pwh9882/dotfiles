@@ -1,3 +1,13 @@
+# macOS
+.DS_Store
+
+# Runtime / application-generated
+.config/iterm2/
+.config/karabiner/
+.config/zed/embeddings/
 .config/zed/conversations/
 .config/zed/prompts/
+.config/zed/settings_backup.json
+
+# Secrets
 *.secrets
