@@ -54,5 +54,8 @@ export COLORTERM=truecolor
 # ---- Secrets (gitignored, 기기별 민감 환경변수) ----
 [[ -f "$HOME/.zshenv.secrets" ]] && source "$HOME/.zshenv.secrets"
 
+# ---- SSH Agent ----
+[[ -f "$HOME/.ssh/agent.env" ]] && source "$HOME/.ssh/agent.env" > /dev/null
+
 # ---- Load machine-specific config ----
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
