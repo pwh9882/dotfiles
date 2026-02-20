@@ -1,0 +1,16 @@
+# ============================================================
+# Machine-specific config for: wini
+# ============================================================
+
+# ---- Remote Dev (VS Code SSH) ----
+cods() {
+    local remote_path=${1:-"/home/ubuntu/"}
+    code --folder-uri "vscode-remote://ssh-remote+normalize.duckdns.org$remote_path"
+}
+
+# ---- Google Drive shortcut ----
+alias gd="cd '$HOME/Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드라이브'"
+
+# ---- Machine-specific settings ----
+ulimit -n 1048575
+DEFAULT_USER=woohyeok
