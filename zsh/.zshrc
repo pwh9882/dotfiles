@@ -54,9 +54,6 @@ export COLORTERM=truecolor
 # ---- Secrets (gitignored, 기기별 민감 환경변수) ----
 [[ -f "$HOME/.zshenv.secrets" ]] && source "$HOME/.zshenv.secrets"
 
-# ---- SSH Agent ----
-[[ -f "$HOME/.ssh/agent.env" ]] && source "$HOME/.ssh/agent.env" > /dev/null
-
 # ---- Load machine-specific config ----
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
 
@@ -64,4 +61,6 @@ export COLORTERM=truecolor
 alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 
 # ---- SSH_AUTH_SOCK for Bitwarden SSH Agent ----
-export SSH_AUTH_SOCK=/Users/woohyeok/.bitwarden-ssh-agent.sock
+# Bitwarden Desktop 앱의 SSH Agent 소켓 (dmg 설치 기준)
+# App Store 설치: $HOME/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock
+export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"

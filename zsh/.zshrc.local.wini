@@ -14,3 +14,10 @@ alias gd="cd '$HOME/Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드�
 # ---- Machine-specific settings ----
 ulimit -n 1048575
 DEFAULT_USER=woohyeok
+
+# OpenClaw Completion
+source "/Users/woohyeok/.openclaw/completions/openclaw.zsh"
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
