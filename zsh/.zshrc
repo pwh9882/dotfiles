@@ -18,6 +18,7 @@ alias ls="lsd"
 alias ll="ls -alhF"
 alias tf="terraform"
 alias cld="claude"
+alias bwu='export BW_SESSION=$(bw unlock --raw)'
 alias ytd='yt-dlp --cookies-from-browser safari -f "bv*[height<=1080][vcodec^=avc1][ext=mp4]+ba[ext=m4a]/mp4" -o "%(title)s.%(ext)s"'
 alias j="z"
 

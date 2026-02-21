@@ -25,6 +25,7 @@ command -v lsd &>/dev/null && alias ls="lsd"
 alias ll="ls -alhF"
 alias tf="terraform"
 alias cld="claude"
+alias bwu='export BW_SESSION=$(bw unlock --raw)'
 alias j="z"
 
 # ---- Common PATH ----
