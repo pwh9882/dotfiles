@@ -54,5 +54,17 @@ export COLORTERM=truecolor
 [[ -f "$HOME/.bashrc.local" ]] && source "$HOME/.bashrc.local"
 
 # ---- SSH_AUTH_SOCK for Bitwarden SSH Agent ----
-# Bitwarden Desktop 앱의 SSH Agent 소켓 (GUI가 있는 Linux 데스크톱에서만 동작)
-export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    # WSL2: Windows Bitwarden Desktop → npiperelay + socat 브릿지
+    export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
+    if ! ss -a 2>/dev/null | grep -q "$SSH_AUTH_SOCK"; then
+        rm -f "$SSH_AUTH_SOCK"
+        mkdir -p "$HOME/.ssh"
+        setsid socat \
+            UNIX-LISTEN:"$SSH_AUTH_SOCK",fork \
+            EXEC:"npiperelay.exe -ei -s //./pipe/openssh-ssh-agent",nofork &>/dev/null &
+    fi
+else
+    # Native Linux: Bitwarden Desktop 앱의 SSH Agent 소켓
+    export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"
+fi

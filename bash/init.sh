@@ -33,9 +33,29 @@ install_lsd() {
     fi
 }
 
+install_wsl_deps() {
+    if grep -qi microsoft /proc/version 2>/dev/null; then
+        echo "  WSL detected"
+        if ! command -v socat &>/dev/null; then
+            echo "  Installing socat..."
+            sudo apt install -y socat
+        fi
+        if ! command -v npiperelay.exe &>/dev/null; then
+            echo "  Installing npiperelay..."
+            if command -v go &>/dev/null; then
+                go install github.com/jstarks/npiperelay@latest
+            else
+                echo "  ⚠ go not found. Install npiperelay manually:"
+                echo "    go install github.com/jstarks/npiperelay@latest"
+            fi
+        fi
+    fi
+}
+
 install_starship
 install_zoxide
 install_lsd
+install_wsl_deps
 
 # ---- Symlink shared .bashrc ----
 ln -sf "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc"
