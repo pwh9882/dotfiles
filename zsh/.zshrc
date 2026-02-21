@@ -59,3 +59,9 @@ export COLORTERM=truecolor
 
 # ---- Load machine-specific config ----
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
+
+# ---- Tailscale CLI Alias ----
+alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+
+# ---- SSH_AUTH_SOCK for Bitwarden SSH Agent ----
+export SSH_AUTH_SOCK=/Users/woohyeok/.bitwarden-ssh-agent.sock
