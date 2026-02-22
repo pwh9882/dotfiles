@@ -366,7 +366,7 @@ tmux_conf_theme_clock_style="24"
 #   - false (default)
 #   - disabled
 # on Linux, this requires xsel, xclip or wl-copy
-tmux_conf_copy_to_os_clipboard=false
+tmux_conf_copy_to_os_clipboard=true
 
 
 # -- urlscan -------------------------------------------------------------------
@@ -384,6 +384,9 @@ tmux_conf_urlscan_options="--compact --dedupe"
 
 # start with mouse mode enabled
 set -g mouse on
+
+# OSC 52 clipboard: 터미널(WezTerm)을 통해 클립보드 전파 (SSH, tmux 통과)
+set -g set-clipboard on
 
 # 마우스 드래그 후: 선택 확정 + 하이라이트 유지 (스크롤해도 확장 안 됨)
 bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-no-clear #!important
