@@ -38,6 +38,9 @@ function M.apply(config, is_macos)
     -- Tab title (Color Badge Style)
     wezterm.on('format-tab-title', function(tab, tabs, panes, cfg, hover, max_width)
         local title = tab.active_pane.title or ''
+        -- Strip hostname (already shown in status bar)
+        title = title:gsub('^%S+%s+❐%s*', '')  -- Oh My Tmux: #h ❐ #S ● #I #W
+        title = title:gsub('^%S+@%S+:%s*', '')  -- SSH shell: user@host: path
         local idx = tostring(tab.tab_index + 1)
 
         if tab.is_active then
