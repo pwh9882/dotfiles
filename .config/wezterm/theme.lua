@@ -35,17 +35,60 @@ function M.apply(config, is_macos)
         },
     }
 
+    -- Accent colors for hostname-based badge coloring
+    local accents = { c.sapphire, c.green, c.lavender, c.peach, c.flamingo, c.yellow }
+    local local_host = wezterm.hostname():match('^([^%.]+)') or ''
+
+    local function detect_host(pane_info)
+        -- 1) user_vars.WEZTERM_HOST (set by remote .zshrc)
+        local uv = pane_info.user_vars
+        local h = uv and uv.WEZTERM_HOST or nil
+        if h and h ~= '' and h ~= local_host then return h end
+        -- 2) Pane title patterns (Linux SSH / tmux)
+        local t = pane_info.title or ''
+        h = t:match('^(%S+)%s+❐')              -- Oh My Tmux: host ❐ ...
+         or t:match('^%S+@([%w%-%._]+)')        -- SSH shell: user@host[: ...]
+        if h and h ~= local_host then return h end
+        return nil
+    end
+
+    local function hash_idx(s)
+        local h = 0
+        for i = 1, #s do h = h + string.byte(s, i) end
+        return (h % #accents) + 1
+    end
+
     -- Tab title (Color Badge Style)
     wezterm.on('format-tab-title', function(tab, tabs, panes, cfg, hover, max_width)
         local title = tab.active_pane.title or ''
+
+        -- Assign unique badge colors per hostname (hash + collision avoidance)
+        local host_colors = {}
+        local used = {}
+        for _, t in ipairs(tabs) do
+            local h = detect_host(t.active_pane)
+            if h and not host_colors[h] then
+                local idx = hash_idx(h)
+                for _ = 1, #accents do
+                    if not used[idx] then break end
+                    idx = (idx % #accents) + 1
+                end
+                used[idx] = true
+                host_colors[h] = accents[idx]
+            end
+        end
+
+        local host = detect_host(tab.active_pane)
+        local badge = host and host_colors[host] or c.mauve
+
         -- Strip hostname (already shown in status bar)
-        title = title:gsub('^%S+%s+❐%s*', '')  -- Oh My Tmux: #h ❐ #S ● #I #W
-        title = title:gsub('^%S+@%S+:%s*', '')  -- SSH shell: user@host: path
+        title = title:gsub('^%S+%s+❐%s*', '')           -- Oh My Tmux: #h ❐ #S ● #I #W
+        title = title:gsub('^%S+@[%w%-%._]+[:%s]*', '') -- SSH shell: user@host[: path]
         local idx = tostring(tab.tab_index + 1)
 
         if tab.is_active then
             return {
-                { Background = { Color = c.mauve } },
+                { Background = { Color = badge } },
                 { Foreground = { Color = c.crust } },
                 { Attribute = { Intensity = 'Bold' } },
                 { Text = ' ' .. idx .. ' ' },
@@ -56,7 +99,7 @@ function M.apply(config, is_macos)
         end
         return {
             { Background = { Color = c.surface0 } },
-            { Foreground = { Color = c.fg_dim } },
+            { Foreground = { Color = badge } },
             { Text = ' ' .. idx .. ' ' },
             { Background = { Color = c.mantle } },
             { Foreground = { Color = c.fg_dim } },
