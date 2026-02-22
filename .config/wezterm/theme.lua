@@ -40,15 +40,15 @@ function M.apply(config, is_macos)
     local local_host = wezterm.hostname():match('^([^%.]+)') or ''
 
     local function detect_host(pane_info)
-        -- 1) user_vars.WEZTERM_HOST (set by remote .zshrc)
-        local uv = pane_info.user_vars
-        local h = uv and uv.WEZTERM_HOST or nil
-        if h and h ~= '' and h ~= local_host then return h end
-        -- 2) Pane title patterns (Linux SSH / tmux)
+        -- 1) Pane title patterns (most up-to-date for nested SSH)
         local t = pane_info.title or ''
-        h = t:match('^(%S+)%s+❐')              -- Oh My Tmux: host ❐ ...
-         or t:match('^%S+@([%w%-%._]+)')        -- SSH shell: user@host[: ...]
+        local h = t:match('^(%S+)%s+❐')              -- Oh My Tmux: host ❐ ...
+              or t:match('^%S+@([%w%-%._]+)')         -- SSH shell: user@host[: ...]
         if h and h ~= local_host then return h end
+        -- 2) user_vars.WEZTERM_HOST (fallback for macOS where title has no hostname)
+        local uv = pane_info.user_vars
+        h = uv and uv.WEZTERM_HOST or nil
+        if h and h ~= '' and h ~= local_host then return h end
         return nil
     end
 
