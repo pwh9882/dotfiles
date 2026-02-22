@@ -169,9 +169,9 @@ precmd_functions+=(_wezterm_set_host)
 
 ### 새 기기 추가 시
 
-원격 기기에 dotfiles를 설치하면 자동 적용:
+원격 기기에 dotfiles를 설치하면 자동 적용 (멱등성 보장):
 ```bash
-git clone <repo> ~/dotfiles && bash ~/dotfiles/zsh/init.sh
+git clone <repo> ~/dotfiles && bash ~/dotfiles/init.sh
 ```
 
 ## Configuration Files
