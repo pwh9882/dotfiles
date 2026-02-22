@@ -45,8 +45,21 @@ install_wsl_deps() {
             if command -v go &>/dev/null; then
                 go install github.com/jstarks/npiperelay@latest
             else
-                echo "  ⚠ go not found. Install npiperelay manually:"
-                echo "    go install github.com/jstarks/npiperelay@latest"
+                # Download prebuilt binary from GitHub releases
+                local tmpdir
+                tmpdir=$(mktemp -d)
+                echo "  Downloading npiperelay from GitHub releases..."
+                curl -sL "https://github.com/jstarks/npiperelay/releases/download/v0.1.0/npiperelay_windows_amd64.zip" -o "$tmpdir/npiperelay.zip"
+                if command -v unzip &>/dev/null; then
+                    unzip -q "$tmpdir/npiperelay.zip" -d "$tmpdir"
+                    mkdir -p "$HOME/.local/bin"
+                    mv "$tmpdir/npiperelay.exe" "$HOME/.local/bin/npiperelay.exe"
+                    chmod +x "$HOME/.local/bin/npiperelay.exe"
+                    echo "  ✅ npiperelay.exe installed to ~/.local/bin/"
+                else
+                    echo "  ⚠ unzip not found. Install unzip and retry."
+                fi
+                rm -rf "$tmpdir"
             fi
         fi
     fi

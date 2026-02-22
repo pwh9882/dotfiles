@@ -6,8 +6,8 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 echo "📦 Setting up .config..."
 
-# ---- Install fonts ----
-if command -v brew &>/dev/null; then
+# ---- Install fonts (macOS only — WSL/Linux fonts are managed by the host terminal) ----
+if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &>/dev/null; then
   BREW_CASKS=(font-jetbrains-mono-nerd-font)
   for cask in "${BREW_CASKS[@]}"; do
     if ! brew list --cask "$cask" &>/dev/null; then
@@ -32,9 +32,21 @@ for dir in "${DIRS[@]}"; do
   fi
 done
 
-# ---- File symlinks ----
-ln -sf "$SCRIPT_DIR/starship.toml" "$CONFIG_DIR/starship.toml"
-echo "  ✅ Linked starship.toml"
+# ---- Starship config ----
+HOSTNAME="$(hostname -s)"
+OVERRIDE_SCRIPT="$SCRIPT_DIR/starship.overrides.$HOSTNAME.sh"
+
+if [[ -f "$OVERRIDE_SCRIPT" ]]; then
+  # Machine with overrides: remove symlink first, then copy + patch
+  rm -f "$CONFIG_DIR/starship.toml"
+  cp "$SCRIPT_DIR/starship.toml" "$CONFIG_DIR/starship.toml"
+  bash "$OVERRIDE_SCRIPT" "$CONFIG_DIR/starship.toml"
+  echo "  ✅ Patched starship.toml for $HOSTNAME"
+else
+  # Default: symlink for instant updates
+  ln -sf "$SCRIPT_DIR/starship.toml" "$CONFIG_DIR/starship.toml"
+  echo "  ✅ Linked starship.toml"
+fi
 
 # ---- Zed: settings.json only (avoid runtime file pollution) ----
 if [[ -f "$SCRIPT_DIR/zed/settings.json" ]]; then

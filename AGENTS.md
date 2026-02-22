@@ -49,6 +49,7 @@ Zsh 설정은 공통/기기별로 분리되어 있다:
 | `ddps-mini` | Mac Mini |
 | `woohyeok-MacBookPro` | MacBook Pro |
 | `wini` | Mac Mini |
+| `woopc` | WSL2 (Windows PC) |
 
 새 기기 추가 시: `zsh/.zshrc.local.<새 hostname>` 생성 후 `bash zsh/init.sh` 실행.
 
