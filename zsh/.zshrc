@@ -46,9 +46,11 @@ fi
 # kiro
 [[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
 
-# WezTerm: broadcast hostname as user var for tab badge coloring
-# Always emit — harmless in non-WezTerm terminals, and SSH doesn't forward WEZTERM_EXECUTABLE
-printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_HOST "$(echo -n "$(hostname -s)" | base64)"
+# WezTerm: broadcast hostname via user var on every prompt
+# Re-emitting on precmd ensures the value resets after exiting SSH
+_wezterm_host_b64="$(echo -n "$(hostname -s)" | base64)"
+_wezterm_set_host() { printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_HOST "$_wezterm_host_b64"; }
+precmd_functions+=(_wezterm_set_host)
 
 # starship prompt
 command -v starship &>/dev/null && eval "$(starship init zsh)"
