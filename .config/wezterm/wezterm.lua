@@ -35,7 +35,7 @@ else
 end
 
 -- ---- Apply modules ----
-theme.apply(config)
+theme.apply(config, is_macos)
 keys.apply(config, is_macos)
 
 if is_macos then

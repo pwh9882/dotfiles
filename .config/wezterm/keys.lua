@@ -39,6 +39,14 @@ function M.apply(config, is_macos)
         }},
 
         { key = 'Enter', mods = 'SHIFT', action = wezterm.action { SendString = "\x1b\r" } },
+
+        -- tmux prefix indicator (Ctrl+B → pass through + show badge)
+        { key = 'b', mods = 'CTRL', action = wezterm.action.Multiple({
+            wezterm.action.SendKey { key = 'b', mods = 'CTRL' },
+            wezterm.action.ActivateKeyTable {
+                name = 'tmux_prefix', timeout_milliseconds = 2000,
+            },
+        })},
     }
 
     -- Platform-specific keybindings
@@ -92,6 +100,7 @@ function M.apply(config, is_macos)
             resize_pane('h', 'Left'),
             resize_pane('l', 'Right'),
         },
+        tmux_prefix = {},  -- empty: all keys pass through to tmux, badge shown until timeout
     }
 end
 

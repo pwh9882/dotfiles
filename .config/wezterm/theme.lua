@@ -15,9 +15,11 @@ M.colors = {
     green    = '#a6e3a1',
     lavender = '#b4befe',
     yellow   = '#f9e2af',
+    peach    = '#fab387',
+    flamingo = '#f2cdcd',
 }
 
-function M.apply(config)
+function M.apply(config, is_macos)
     local c = M.colors
 
     -- Tab bar colors
@@ -60,54 +62,51 @@ function M.apply(config)
         }
     end)
 
-    -- Status bar (Powerline + Leader)
+    -- Status bar (flat blocks)
     wezterm.on('update-status', function(window, pane)
         local workspace = window:active_workspace():gsub('%c', '')
         local host = wezterm.hostname():gsub('%.[^%.]+$', '')
 
         local right = {}
 
-        -- Leader indicator
+        -- Mode indicator (leader / key table)
+        local key_table = window:active_key_table()
+        local mode_labels = {
+            tmux_prefix  = { text = ' ^B ',     color = c.flamingo },
+            resize_panes = { text = ' RESIZE ', color = c.peach },
+        }
+
         if window:leader_is_active() then
-            table.insert(right, { Background = { Color = c.crust } })
-            table.insert(right, { Foreground = { Color = c.yellow } })
-            table.insert(right, { Text = '\u{e0b6}' })
             table.insert(right, { Background = { Color = c.yellow } })
             table.insert(right, { Foreground = { Color = c.crust } })
             table.insert(right, { Attribute = { Intensity = 'Bold' } })
             table.insert(right, { Text = ' ^A ' })
-            table.insert(right, { Background = { Color = c.sapphire } })
-            table.insert(right, { Foreground = { Color = c.yellow } })
-            table.insert(right, { Text = '\u{e0b4}' })
-        else
-            table.insert(right, { Background = { Color = c.crust } })
-            table.insert(right, { Foreground = { Color = c.sapphire } })
-            table.insert(right, { Text = '\u{e0b6}' })
+        elseif key_table and mode_labels[key_table] then
+            local mode = mode_labels[key_table]
+            table.insert(right, { Background = { Color = mode.color } })
+            table.insert(right, { Foreground = { Color = c.crust } })
+            table.insert(right, { Attribute = { Intensity = 'Bold' } })
+            table.insert(right, { Text = mode.text })
         end
 
         -- Workspace
-        table.insert(right, { Background = { Color = c.sapphire } })
-        table.insert(right, { Foreground = { Color = c.crust } })
+        table.insert(right, { Background = { Color = c.surface0 } })
+        table.insert(right, { Foreground = { Color = c.fg } })
         table.insert(right, { Attribute = { Intensity = 'Bold' } })
-        table.insert(right, { Text = ' \u{f4bc} ' .. workspace .. ' ' })
+        table.insert(right, { Text = ' \u{eb45} ' .. workspace .. ' ' })
 
         -- Time
-        table.insert(right, { Background = { Color = c.green } })
-        table.insert(right, { Foreground = { Color = c.sapphire } })
-        table.insert(right, { Text = '\u{e0b4}' })
-        table.insert(right, { Background = { Color = c.green } })
-        table.insert(right, { Foreground = { Color = c.crust } })
-        table.insert(right, { Attribute = { Intensity = 'Bold' } })
-        table.insert(right, { Text = ' \u{f0350} ' .. wezterm.strftime('%H:%M') .. ' ' })
+        table.insert(right, { Background = { Color = c.mantle } })
+        table.insert(right, { Foreground = { Color = c.fg_dim } })
+        table.insert(right, { Attribute = { Intensity = 'Normal' } })
+        table.insert(right, { Text = ' ' .. wezterm.strftime('%H:%M') .. ' ' })
 
-        -- Host
-        table.insert(right, { Background = { Color = c.lavender } })
-        table.insert(right, { Foreground = { Color = c.green } })
-        table.insert(right, { Text = '\u{e0b4}' })
-        table.insert(right, { Background = { Color = c.lavender } })
-        table.insert(right, { Foreground = { Color = c.crust } })
+        -- Host (OS icon)
+        local os_icon = is_macos and '\u{f0179}' or '\u{f17c}'
+        table.insert(right, { Background = { Color = c.surface0 } })
+        table.insert(right, { Foreground = { Color = c.fg } })
         table.insert(right, { Attribute = { Intensity = 'Bold' } })
-        table.insert(right, { Text = ' \u{f048b} ' .. host .. ' ' })
+        table.insert(right, { Text = ' ' .. os_icon .. ' ' .. host .. ' ' })
 
         window:set_right_status(wezterm.format(right))
     end)
