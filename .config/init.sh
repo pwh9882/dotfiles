@@ -55,4 +55,15 @@ if [[ -f "$SCRIPT_DIR/zed/settings.json" ]]; then
   echo "  ✅ Linked zed/settings.json"
 fi
 
+# ---- WSL: sync WezTerm config to Windows side ----
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n')
+  WIN_WEZTERM_DIR="/mnt/c/Users/$WIN_USER/.config/wezterm"
+  if [[ -n "$WIN_USER" && -d "/mnt/c/Users/$WIN_USER" ]]; then
+    mkdir -p "$WIN_WEZTERM_DIR"
+    cp "$SCRIPT_DIR/wezterm/wezterm.windows.lua" "$WIN_WEZTERM_DIR/wezterm.lua"
+    echo "  ✅ Synced WezTerm config to Windows ($WIN_USER)"
+  fi
+fi
+
 echo "🎉 .config setup complete!"
