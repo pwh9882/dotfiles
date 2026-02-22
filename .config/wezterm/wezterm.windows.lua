@@ -7,6 +7,30 @@ local config = wezterm.config_builder()
 config.color_scheme = 'Github Dark (Gogh)'
 config.colors = {
     foreground = '#e6edf3',
+    tab_bar = {
+        background = '#0d1117',
+        active_tab = {
+            bg_color = '#1f6feb',
+            fg_color = '#f0f6fc',
+            intensity = 'Bold',
+        },
+        inactive_tab = {
+            bg_color = '#161b22',
+            fg_color = '#8b949e',
+        },
+        inactive_tab_hover = {
+            bg_color = '#21262d',
+            fg_color = '#c9d1d9',
+        },
+        new_tab = {
+            bg_color = '#0d1117',
+            fg_color = '#8b949e',
+        },
+        new_tab_hover = {
+            bg_color = '#21262d',
+            fg_color = '#c9d1d9',
+        },
+    },
 }
 config.font = wezterm.font('JetBrainsMonoNL Nerd Font')
 config.font_size = 9
@@ -17,41 +41,107 @@ config.window_decorations = 'RESIZE'
 config.window_frame = {
     font = wezterm.font({ family = 'JetBrainsMonoNL Nerd Font', weight = 'Bold' }),
     font_size = 8,
+    active_titlebar_bg = '#0d1117',
+    inactive_titlebar_bg = '#0d1117',
 }
 config.use_fancy_tab_bar = true
-config.tab_max_width = 25
+config.tab_max_width = 32
 config.command_palette_font_size = 9
 config.char_select_font_size = 9
+-- Command palette internally renders ESC key labels as literal U+001B glyphs,
+-- which no font contains. This is a known WezTerm issue, not a config problem.
+-- https://github.com/wez/wezterm/issues/6591
+config.warn_about_missing_glyphs = false
 
--- ---- Right status bar (workspace + time + hostname) ----
-wezterm.on('update-status', function(window, _)
+-- ---- Tab title: icon + directory name ----
+local process_icons = {
+    ['zsh']        = ' ',
+    ['bash']       = ' ',
+    ['fish']       = '󰈺 ',
+    ['nvim']       = ' ',
+    ['vim']        = ' ',
+    ['node']       = '󰎙 ',
+    ['python']     = '󰌠 ',
+    ['python3']    = '󰌠 ',
+    ['git']        = '󰊢 ',
+    ['ssh']        = '󰣀 ',
+    ['claude']     = '󰚩 ',
+    ['docker']     = '󰡨 ',
+    ['cargo']      = '󱘗 ',
+    ['go']         = '󰟓 ',
+    ['lazygit']    = ' ',
+    ['htop']       = '󰍛 ',
+    ['btop']       = '󰍛 ',
+    ['tmux']       = ' ',
+    ['powershell'] = '󰨊 ',
+    ['cmd']        = ' ',
+}
+
+local function get_process_icon(tab)
+    local name = tab.active_pane.foreground_process_name or ''
+    local process = name:match('([^/\\]+)$') or ''
+    process = process:gsub('%.exe$', ''):gsub('%c', '')
+    return process_icons[process] or '󰞷 '
+end
+
+local function get_directory(tab)
+    local cwd = tab.active_pane.current_working_dir
+    if cwd then
+        local path = cwd.file_path or tostring(cwd)
+        -- Show last directory component
+        local dir = path:match('([^/\\]+)[/\\]?$') or path
+        return dir
+    end
+    return ''
+end
+
+wezterm.on('format-tab-title', function(tab, tabs, panes, cfg, hover, max_width)
+    local icon = get_process_icon(tab)
+    local dir = get_directory(tab)
+    local title = icon .. dir
+
+    -- Truncate if needed
+    if #title > max_width - 2 then
+        title = wezterm.truncate_right(title, max_width - 3) .. '…'
+    end
+
+    return ' ' .. title .. ' '
+end)
+
+-- ---- Right status bar (powerline: workspace + time + hostname) ----
+wezterm.on('update-status', function(window, pane)
     local SOLID_LEFT_ARROW = utf8.char(0xe0b2)
+
+    -- Left status: leader indicator
+    local leader = ''
+    if window:leader_is_active() then
+        leader = wezterm.format {
+            { Foreground = { Color = '#1f6feb' } },
+            { Text = '  LEADER ' },
+        }
+    end
+    window:set_left_status(leader)
+
+    -- Right status: workspace + time + hostname
+    -- gsub: strip any control characters that might leak into display
+    local workspace = window:active_workspace():gsub('%c', '')
+    local host = wezterm.hostname():gsub('%c', '')
     local segments = {
-        window:active_workspace(),
-        wezterm.strftime('%a %b %-d %H:%M'),
-        wezterm.hostname(),
+        { text = ' ' .. workspace, color = '#1f6feb' },
+        { text = '󰃰 ' .. wezterm.strftime('%H:%M'), color = '#238636' },
+        { text = '󰒋 ' .. host, color = '#8957e5' },
     }
-
-    local color_scheme = window:effective_config().resolved_palette
-    local bg = wezterm.color.parse(color_scheme.background)
-    local fg = color_scheme.foreground
-    local gradient_from = bg:lighten(0.2)
-
-    local gradient = wezterm.color.gradient(
-        { orientation = 'Horizontal', colors = { gradient_from, bg } },
-        #segments
-    )
 
     local elements = {}
     for i, seg in ipairs(segments) do
         if i == 1 then
             table.insert(elements, { Background = { Color = 'none' } })
         end
-        table.insert(elements, { Foreground = { Color = gradient[i] } })
+        table.insert(elements, { Foreground = { Color = seg.color } })
         table.insert(elements, { Text = SOLID_LEFT_ARROW })
-        table.insert(elements, { Foreground = { Color = fg } })
-        table.insert(elements, { Background = { Color = gradient[i] } })
-        table.insert(elements, { Text = ' ' .. seg .. ' ' })
+        table.insert(elements, { Foreground = { Color = '#f0f6fc' } })
+        table.insert(elements, { Background = { Color = seg.color } })
+        table.insert(elements, { Text = ' ' .. seg.text .. ' ' })
     end
 
     window:set_right_status(wezterm.format(elements))
@@ -62,8 +152,8 @@ config.default_domain = 'WSL:Ubuntu-24.04'
 
 -- ---- Launch menu (PowerShell, CMD without Windows Terminal) ----
 config.launch_menu = {
-    { label = ' PowerShell', args = { 'powershell.exe' } },
-    { label = ' CMD', args = { 'cmd.exe' } },
+    { label = '󰨊 PowerShell', args = { 'powershell.exe' }, domain = { DomainName = 'local' } },
+    { label = ' CMD', args = { 'cmd.exe' }, domain = { DomainName = 'local' } },
 }
 
 -- ---- Leader key (Ctrl+A, same as Mac) ----
