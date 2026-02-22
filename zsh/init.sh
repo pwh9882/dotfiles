@@ -94,15 +94,35 @@ else
     fi
 fi
 
+# ---- Set zsh as default shell ----
+ZSH_PATH="$(which zsh)"
+if [[ "$(getent passwd "$USER" | cut -d: -f7)" != "$ZSH_PATH" ]]; then
+    echo "  Changing default shell to zsh..."
+    chsh -s "$ZSH_PATH"
+    echo "  ✅ Default shell changed to zsh"
+else
+    echo "  ✅ Default shell is already zsh"
+fi
+
 # ---- Symlink shared .zshrc ----
 ln -sf "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
 echo "  Linked .zshrc"
 
 # ---- Symlink machine-specific local config ----
-if [[ -f "$LOCAL_FILE" ]]; then
-    ln -sf "$LOCAL_FILE" "$HOME/.zshrc.local"
-    echo "  Linked .zshrc.local -> .zshrc.local.$HOSTNAME"
-else
-    echo "  ⚠ No local config found for hostname '$HOSTNAME'"
-    echo "  Create one at: $SCRIPT_DIR/.zshrc.local.$HOSTNAME"
+if [[ ! -f "$LOCAL_FILE" ]]; then
+    echo "  Creating .zshrc.local.$HOSTNAME..."
+    cat > "$LOCAL_FILE" <<TMPL
+# ============================================================
+# Machine-specific config for: $HOSTNAME
+# ============================================================
+
+DEFAULT_USER=$USER
+
+# ---- Linuxbrew (if installed) ----
+# if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+#     eval "\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+# fi
+TMPL
 fi
+ln -sf "$LOCAL_FILE" "$HOME/.zshrc.local"
+echo "  Linked .zshrc.local -> .zshrc.local.$HOSTNAME"

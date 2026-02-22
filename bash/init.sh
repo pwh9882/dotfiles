@@ -42,10 +42,18 @@ ln -sf "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc"
 echo "  Linked .bashrc"
 
 # ---- Symlink machine-specific local config ----
-if [[ -f "$LOCAL_FILE" ]]; then
-    ln -sf "$LOCAL_FILE" "$HOME/.bashrc.local"
-    echo "  Linked .bashrc.local -> .bashrc.local.$HOSTNAME"
-else
-    echo "  ⚠ No local config found for hostname '$HOSTNAME'"
-    echo "  Create one at: $SCRIPT_DIR/.bashrc.local.$HOSTNAME"
+if [[ ! -f "$LOCAL_FILE" ]]; then
+    echo "  Creating .bashrc.local.$HOSTNAME..."
+    cat > "$LOCAL_FILE" <<TMPL
+# ============================================================
+# Machine-specific config for: $HOSTNAME
+# ============================================================
+
+# ---- Linuxbrew (if installed) ----
+# if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+#     eval "\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+# fi
+TMPL
 fi
+ln -sf "$LOCAL_FILE" "$HOME/.bashrc.local"
+echo "  Linked .bashrc.local -> .bashrc.local.$HOSTNAME"
