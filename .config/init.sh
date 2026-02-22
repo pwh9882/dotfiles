@@ -61,7 +61,7 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
   WIN_WEZTERM_DIR="/mnt/c/Users/$WIN_USER/.config/wezterm"
   if [[ -n "$WIN_USER" && -d "/mnt/c/Users/$WIN_USER" ]]; then
     mkdir -p "$WIN_WEZTERM_DIR"
-    cp "$SCRIPT_DIR/wezterm/wezterm.windows.lua" "$WIN_WEZTERM_DIR/wezterm.lua"
+    cp "$SCRIPT_DIR/wezterm/wezterm.lua" "$WIN_WEZTERM_DIR/wezterm.lua"
     echo "  ✅ Synced WezTerm config to Windows ($WIN_USER)"
   fi
 fi
