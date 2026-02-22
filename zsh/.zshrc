@@ -53,6 +53,7 @@ _wezterm_os_b64="$(echo -n "$(uname -s)" | base64)"
 _wezterm_set_vars() {
     printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_HOST "$_wezterm_host_b64"
     printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_OS "$_wezterm_os_b64"
+    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_CWD "$(printf '%s' "${PWD/#$HOME/~}" | base64)"
 }
 precmd_functions+=(_wezterm_set_vars)
 

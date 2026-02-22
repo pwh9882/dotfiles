@@ -81,9 +81,14 @@ function M.apply(config, is_macos)
         local host = detect_host(tab.active_pane)
         local badge = host and host_colors[host] or c.mauve
 
-        -- Strip hostname (already shown in status bar)
-        title = title:gsub('^%S+%s+❐%s*', '')           -- Oh My Tmux: #h ❐ #S ● #I #W
-        title = title:gsub('^%S+@[%w%-%._]+[:%s]*', '') -- SSH shell: user@host[: path]
+        -- For remote panes: use WEZTERM_CWD if available, otherwise strip hostname
+        local uv = tab.active_pane.user_vars or {}
+        if host and uv.WEZTERM_CWD and uv.WEZTERM_CWD ~= '' then
+            title = uv.WEZTERM_CWD
+        else
+            title = title:gsub('^%S+%s+❐%s*', '')           -- Oh My Tmux: #h ❐ #S ● #I #W
+            title = title:gsub('^%S+@[%w%-%._]+[:%s]*', '') -- SSH shell: user@host[: path]
+        end
         local idx = tostring(tab.tab_index + 1)
 
         if tab.is_active then
