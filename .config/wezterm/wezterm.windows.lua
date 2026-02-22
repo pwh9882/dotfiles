@@ -44,24 +44,37 @@ config.colors = {
     },
 }
 
--- ---- Tab title (Solid Color Block) ----
+-- ---- Tab title (Circled Numbers: ①②③ → ❶❷❸) ----
+local circled = {'①','②','③','④','⑤','⑥','⑦','⑧'}
+local filled  = {'❶','❷','❸','❹','❺','❻','❼','❽'}
 wezterm.on('format-tab-title', function(tab, tabs, panes, cfg, hover, max_width)
     local cwd = tab.active_pane.current_working_dir
     local dir = cwd and (cwd.file_path or tostring(cwd)):match('([^/\\]+)[/\\]?$') or ''
-    local title = string.format(' %d: %s ', tab.tab_index + 1, dir)
+    local idx = tab.tab_index + 1
+    local is_last = tab.tab_index == #tabs - 1
+    local num
+    if idx <= 8 then
+        num = tab.is_active and filled[idx] or circled[idx]
+    elseif is_last then
+        num = tab.is_active and '❾' or '⑨'
+    else
+        num = tab.is_active and '\u{f192}' or '\u{f10c}'
+    end
+    local gap = tab.is_active and idx <= 8 and '  ' or ' '
+    local title = ' ' .. num .. gap .. dir .. ' '
 
     if tab.is_active then
         return {
             { Background = { Color = colors.mauve } },
             { Foreground = { Color = colors.crust } },
             { Attribute = { Intensity = 'Bold' } },
-            { Text = ' ' .. title },
+            { Text = title },
         }
     end
     return {
         { Background = { Color = colors.bg_tab } },
         { Foreground = { Color = colors.fg_dim } },
-        { Text = ' ' .. title },
+        { Text = title },
     }
 end)
 
