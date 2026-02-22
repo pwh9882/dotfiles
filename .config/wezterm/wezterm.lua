@@ -18,7 +18,7 @@ config.window_padding = { left = 16, right = 16, top = 16, bottom = 16 }
 config.window_decorations = 'RESIZE'
 
 config.use_fancy_tab_bar = false
-config.tab_max_width = 30
+config.tab_max_width = 60
 config.warn_about_missing_glyphs = false
 
 if is_macos then

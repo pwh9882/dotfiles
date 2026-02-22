@@ -37,8 +37,7 @@ function M.apply(config, is_macos)
 
     -- Tab title (Color Badge Style)
     wezterm.on('format-tab-title', function(tab, tabs, panes, cfg, hover, max_width)
-        local cwd = tab.active_pane.current_working_dir
-        local dir = cwd and (cwd.file_path or tostring(cwd)):match('([^/\\]+)[/\\]?$') or ''
+        local title = tab.active_pane.title or ''
         local idx = tostring(tab.tab_index + 1)
 
         if tab.is_active then
@@ -49,7 +48,7 @@ function M.apply(config, is_macos)
                 { Text = ' ' .. idx .. ' ' },
                 { Background = { Color = c.base } },
                 { Foreground = { Color = c.fg } },
-                { Text = ' ' .. dir .. ' ' },
+                { Text = ' ' .. title .. ' ' },
             }
         end
         return {
@@ -58,7 +57,7 @@ function M.apply(config, is_macos)
             { Text = ' ' .. idx .. ' ' },
             { Background = { Color = c.mantle } },
             { Foreground = { Color = c.fg_dim } },
-            { Text = ' ' .. dir .. ' ' },
+            { Text = ' ' .. title .. ' ' },
         }
     end)
 
@@ -102,7 +101,7 @@ function M.apply(config, is_macos)
         table.insert(right, { Text = ' ' .. wezterm.strftime('%H:%M') .. ' ' })
 
         -- Host (OS icon)
-        local os_icon = is_macos and '\u{f0179}' or '\u{f17c}'
+        local os_icon = is_macos and '\u{f0035}' or '\u{f17c}'
         table.insert(right, { Background = { Color = c.surface0 } })
         table.insert(right, { Foreground = { Color = c.fg } })
         table.insert(right, { Attribute = { Intensity = 'Bold' } })
