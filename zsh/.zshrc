@@ -46,11 +46,15 @@ fi
 # kiro
 [[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
 
-# WezTerm: broadcast hostname via user var on every prompt
-# Re-emitting on precmd ensures the value resets after exiting SSH
+# WezTerm: broadcast host info via user vars on every prompt
+# Re-emitting on precmd ensures values reset after exiting SSH
 _wezterm_host_b64="$(echo -n "$(hostname -s)" | base64)"
-_wezterm_set_host() { printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_HOST "$_wezterm_host_b64"; }
-precmd_functions+=(_wezterm_set_host)
+_wezterm_os_b64="$(echo -n "$(uname -s)" | base64)"
+_wezterm_set_vars() {
+    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_HOST "$_wezterm_host_b64"
+    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_OS "$_wezterm_os_b64"
+}
+precmd_functions+=(_wezterm_set_vars)
 
 # starship prompt
 command -v starship &>/dev/null && eval "$(starship init zsh)"

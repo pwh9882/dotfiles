@@ -107,10 +107,21 @@ function M.apply(config, is_macos)
         }
     end)
 
+    -- Detect remote host from pane object (for update-status)
+    local function detect_host_from_pane(p)
+        local t = p:get_title() or ''
+        local h = t:match('^(%S+)%s+❐')
+              or t:match('^%S+@([%w%-%._]+)')
+        if h and h ~= local_host then return h end
+        local uv = p:get_user_vars() or {}
+        h = uv.WEZTERM_HOST
+        if h and h ~= '' and h ~= local_host then return h end
+        return nil
+    end
+
     -- Status bar (flat blocks)
     wezterm.on('update-status', function(window, pane)
         local workspace = window:active_workspace():gsub('%c', '')
-        local host = wezterm.hostname():gsub('%.[^%.]+$', '')
 
         local right = {}
 
@@ -146,12 +157,27 @@ function M.apply(config, is_macos)
         table.insert(right, { Attribute = { Intensity = 'Normal' } })
         table.insert(right, { Text = ' ' .. wezterm.strftime('%H:%M') .. ' ' })
 
-        -- Host (OS icon)
-        local os_icon = is_macos and '\u{f0035}' or '\u{f17c}'
-        table.insert(right, { Background = { Color = c.surface0 } })
-        table.insert(right, { Foreground = { Color = c.fg } })
+        -- Host — show remote hostname with accent color, or local with default
+        local remote = detect_host_from_pane(pane)
+        local display_host = remote or local_host
+        local os_icon
+        if remote then
+            local uv = pane:get_user_vars() or {}
+            local remote_os = uv.WEZTERM_OS or ''
+            os_icon = remote_os == 'Darwin' and '\u{f0035}' or '\u{f17c}'
+        else
+            os_icon = is_macos and '\u{f0035}' or '\u{f17c}'
+        end
+        if remote then
+            local host_color = accents[hash_idx(remote)]
+            table.insert(right, { Background = { Color = host_color } })
+            table.insert(right, { Foreground = { Color = c.crust } })
+        else
+            table.insert(right, { Background = { Color = c.surface0 } })
+            table.insert(right, { Foreground = { Color = c.fg } })
+        end
         table.insert(right, { Attribute = { Intensity = 'Bold' } })
-        table.insert(right, { Text = ' ' .. os_icon .. ' ' .. host .. ' ' })
+        table.insert(right, { Text = ' ' .. os_icon .. ' ' .. display_host .. ' ' })
 
         window:set_right_status(wezterm.format(right))
     end)
