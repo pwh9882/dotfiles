@@ -49,21 +49,17 @@ function M.apply(config, is_macos)
         return prefix .. table.concat(parts, '/')
     end
 
-    -- Accent colors for hostname-based badge coloring
     local accents = { c.sapphire, c.green, c.lavender, c.peach, c.flamingo, c.yellow }
     local local_host = wezterm.hostname():match('^([^%.]+)') or ''
-
-    -- Per-pane CWD cache (survives title changes like entering tmux)
     local pane_cwd_cache = {}
 
-    local function detect_host(pane_info)
-        -- 1) Pane title patterns (most up-to-date for nested SSH)
-        local t = pane_info.title or ''
-        local h = t:match('^(%S+)%s+❐')              -- Oh My Tmux: host ❐ ...
-              or t:match('^%S+@([%w%-%._]+)')         -- SSH shell: user@host[: ...]
+    -- Detect remote hostname from title + user_vars (nil = local)
+    --   1) title patterns: "host ❐ ..." (Oh My Tmux), "user@host[: ...]" (Linux SSH)
+    --   2) user_vars.WEZTERM_HOST fallback (macOS SSH where title has no hostname)
+    local function detect_remote(title, uv)
+        local h = title:match('^(%S+)%s+❐')
+              or title:match('^%S+@([%w%-%._]+)')
         if h and h ~= local_host then return h end
-        -- 2) user_vars.WEZTERM_HOST (fallback for macOS where title has no hostname)
-        local uv = pane_info.user_vars
         h = uv and uv.WEZTERM_HOST or nil
         if h and h ~= '' and h ~= local_host then return h end
         return nil
@@ -80,10 +76,13 @@ function M.apply(config, is_macos)
         local title = tab.active_pane.title or ''
 
         -- Assign unique badge colors per hostname (hash + collision avoidance)
+        -- Also find current tab's host in the same pass
         local host_colors = {}
         local used = {}
+        local my_host
         for _, t in ipairs(tabs) do
-            local h = detect_host(t.active_pane)
+            local h = detect_remote(t.active_pane.title or '', t.active_pane.user_vars or {})
+            if t.tab_id == tab.tab_id then my_host = h end
             if h and not host_colors[h] then
                 local idx = hash_idx(h)
                 for _ = 1, #accents do
@@ -94,9 +93,7 @@ function M.apply(config, is_macos)
                 host_colors[h] = accents[idx]
             end
         end
-
-        local host = detect_host(tab.active_pane)
-        local badge = host and host_colors[host] or c.mauve
+        local badge = my_host and host_colors[my_host] or c.mauve
 
         -- Strip hostname prefixes from title
         title = title:gsub('^%S+%s+❐%s*', '')           -- Oh My Tmux: #h ❐ #S ● #I #W
@@ -124,28 +121,16 @@ function M.apply(config, is_macos)
         }
     end)
 
-    -- Detect remote host from pane object (for update-status)
-    local function detect_host_from_pane(p)
-        local t = p:get_title() or ''
-        local h = t:match('^(%S+)%s+❐')
-              or t:match('^%S+@([%w%-%._]+)')
-        if h and h ~= local_host then return h end
-        local uv = p:get_user_vars() or {}
-        h = uv.WEZTERM_HOST
-        if h and h ~= '' and h ~= local_host then return h end
-        return nil
-    end
-
     -- Status bar (flat blocks)
     wezterm.on('update-status', function(window, pane)
+        local title = pane:get_title() or ''
         local uv = pane:get_user_vars() or {}
-        local remote = detect_host_from_pane(pane)
+        local remote = detect_remote(title, uv)
         local pid = tostring(pane:pane_id())
         local cwd
 
         if remote then
             -- 1) Title path extraction (most reliable: user@host: /path)
-            local title = pane:get_title() or ''
             cwd = title:match('^%S+@[%w%-%._]+:%s*(.+)')
             -- 2) Fallback: WEZTERM_CWD if host matches (macOS SSH with dotfiles)
             if not cwd or cwd == '' then
@@ -192,7 +177,7 @@ function M.apply(config, is_macos)
             table.insert(right, { Text = mode.text })
         end
 
-        -- CWD (falls back to workspace name if WEZTERM_CWD not set)
+        -- CWD
         table.insert(right, { Background = { Color = c.surface0 } })
         table.insert(right, { Foreground = { Color = c.fg } })
         table.insert(right, { Attribute = { Intensity = 'Bold' } })
@@ -204,27 +189,21 @@ function M.apply(config, is_macos)
         table.insert(right, { Attribute = { Intensity = 'Normal' } })
         table.insert(right, { Text = ' ' .. wezterm.strftime('%H:%M') .. ' ' })
 
-        -- Host — show remote hostname with accent color, or local with default
-        local remote = detect_host_from_pane(pane)
+        -- Host + OS icon (reuse remote/title/uv from above)
         local display_host = remote or local_host
         local os_icon
         if remote then
-            local title = pane:get_title() or ''
             if title:match('^%S+@[%w%-%._]+:') then
                 -- "user@host:" title format is Linux-only
                 os_icon = '\u{f17c}'
             else
-                local remote_os = (pane:get_user_vars() or {}).WEZTERM_OS or ''
-                os_icon = remote_os == 'Darwin' and '\u{f0035}' or '\u{f17c}'
+                os_icon = (uv.WEZTERM_OS or '') == 'Darwin' and '\u{f0035}' or '\u{f17c}'
             end
-        else
-            os_icon = is_macos and '\u{f0035}' or '\u{f17c}'
-        end
-        if remote then
             local host_color = accents[hash_idx(remote)]
             table.insert(right, { Background = { Color = host_color } })
             table.insert(right, { Foreground = { Color = c.crust } })
         else
+            os_icon = is_macos and '\u{f0035}' or '\u{f17c}'
             table.insert(right, { Background = { Color = c.surface0 } })
             table.insert(right, { Foreground = { Color = c.fg } })
         end
