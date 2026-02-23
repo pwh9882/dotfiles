@@ -33,17 +33,21 @@ for dir in "${DIRS[@]}"; do
 done
 
 # ---- Starship config ----
+# Override priority: hostname-specific > OS-specific > symlink (default)
 HOSTNAME="$(hostname -s)"
-OVERRIDE_SCRIPT="$SCRIPT_DIR/starship.overrides.$HOSTNAME.sh"
+OVERRIDE_SCRIPT=""
+if [[ -f "$SCRIPT_DIR/starship.overrides.$HOSTNAME.sh" ]]; then
+  OVERRIDE_SCRIPT="$SCRIPT_DIR/starship.overrides.$HOSTNAME.sh"
+elif [[ "$OSTYPE" != "darwin"* && -f "$SCRIPT_DIR/starship.overrides.linux.sh" ]]; then
+  OVERRIDE_SCRIPT="$SCRIPT_DIR/starship.overrides.linux.sh"
+fi
 
-if [[ -f "$OVERRIDE_SCRIPT" ]]; then
-  # Machine with overrides: remove symlink first, then copy + patch
+if [[ -n "$OVERRIDE_SCRIPT" ]]; then
   rm -f "$CONFIG_DIR/starship.toml"
   cp "$SCRIPT_DIR/starship.toml" "$CONFIG_DIR/starship.toml"
   bash "$OVERRIDE_SCRIPT" "$CONFIG_DIR/starship.toml"
-  echo "  ✅ Patched starship.toml for $HOSTNAME"
+  echo "  ✅ Patched starship.toml ($(basename "$OVERRIDE_SCRIPT"))"
 else
-  # Default: symlink for instant updates
   ln -sf "$SCRIPT_DIR/starship.toml" "$CONFIG_DIR/starship.toml"
   echo "  ✅ Linked starship.toml"
 fi
