@@ -121,51 +121,97 @@ Then in WezTerm:
 - Detailed logging for debugging session issues
 - Graceful fallback when saved sessions are corrupted
 
-## SSH Host Color-Coded Tab Badges
+## SSH Remote Detection System
 
-SSH로 원격 서버에 접속하면 탭 배지(번호 부분)가 호스트별 고유 색상으로 표시된다.
-로컬 탭은 기본 mauve, 원격 탭은 Catppuccin accent 6색 중 하나.
+SSH 접속 시 탭 배지, 상태 바 CWD, 호스트명, OS 아이콘이 원격 호스트에 맞게 자동 변경된다.
 
-### 문제
+### 구조 개요
 
-WezTerm은 일반 `ssh` 명령으로 접속한 원격 호스트를 직접 알 수 없다:
+```
+┌─ Shell (zsh precmd) ─────────────────────────────┐
+│  OSC 1337 SetUserVar로 매 프롬프트마다 전송:      │
+│  • WEZTERM_HOST  — hostname -s                    │
+│  • WEZTERM_OS    — uname -s (Darwin/Linux)        │
+│  • WEZTERM_CWD   — ${PWD/#$HOME/~}               │
+└──────────────────────────────────────────────────-┘
+                        ▼
+┌─ WezTerm (theme.lua) ────────────────────────────┐
+│                                                   │
+│  detect_host(pane)  ← 원격 호스트 감지            │
+│    1) pane title 패턴 매칭                        │
+│       • "host ❐ ..."        (Oh My Tmux)          │
+│       • "user@host[: ...]"  (Linux SSH)           │
+│    2) user_vars.WEZTERM_HOST (macOS SSH 등)       │
+│                                                   │
+│  감지 결과 → 탭 배지 / 상태 바에 반영             │
+└───────────────────────────────────────────────────┘
+```
+
+### 왜 2단계 감지인가
+
+WezTerm은 일반 `ssh` 명령의 원격 호스트를 직접 알 수 없다:
 - `current_working_dir.host` — SSH 후에도 로컬 hostname 유지
-- `tab.active_pane.title` — macOS 타겟은 `~`만 표시 (hostname 없음)
-- Linux 타겟만 `user@host: path` 또는 Oh My Tmux `host ❐ session ● ...` 형태로 hostname 포함
+- `tab.active_pane.title` — **Linux**는 `user@host: path` 포함, **macOS**는 `~`만 표시
 
-### 해결: 2단계 감지
+따라서 title 패턴을 먼저, user_vars를 fallback으로 사용한다.
+title 우선인 이유: nested SSH (MacBook → A → B)에서 title은 최종 호스트(B)를 반영하지만,
+user_vars는 중간 호스트(A)에 머물기 때문.
+
+### 탭 배지 (색상 할당)
+
+| 상태 | 배지 색상 | 스타일 |
+|------|----------|--------|
+| 로컬 | mauve (기본) | 활성: 색상 배경 + 어두운 글자 |
+| 원격 | 호스트별 accent | 비활성: 어두운 배경 + 색상 글자 |
+
+- 6색 팔레트: sapphire, green, lavender, peach, flamingo, yellow
+- 호스트명 해시 → 선호 색상 → 충돌 시 다음 색상으로 이동
+
+### 상태 바 CWD (3단계 우선순위)
 
 ```
-detect_host(pane_info)
-  1) pane title 패턴 매칭 (Linux SSH / tmux에서 동작)
-     - "host ❐ ..."       → Oh My Tmux 타이틀
-     - "user@host[: ...]" → 일반 SSH 셸 타이틀
-  2) user_vars.WEZTERM_HOST (macOS 등 title에 hostname 없는 경우)
-     → .zshrc의 precmd 훅이 매 프롬프트마다 hostname을 user var로 전송
+원격 pane:
+  1) pane title에서 path 추출  ← "user@host: /path" 형식 (가장 신뢰)
+  2) WEZTERM_CWD               ← host 일치 시만 (macOS SSH + dotfiles)
+  3) pane별 캐시               ← tmux 진입 등으로 title이 바뀔 때
+
+로컬 pane:
+  → WEZTERM_CWD (precmd가 매번 갱신)
+
+모두 실패 시:
+  → 원격 hostname 또는 workspace 이름
 ```
 
-title 패턴을 먼저 확인하는 이유: nested SSH (MacBook → wini → pi)에서
-title은 최종 호스트(pi)를 반영하지만, user_vars는 중간 호스트(wini)에 머물기 때문.
+title 추출을 최우선하는 이유: 원격 기기의 dotfiles가 오래되어
+`WEZTERM_CWD`를 전송하지 않더라도 title에서 path를 얻을 수 있기 때문.
+
+### 상태 바 호스트 & OS 아이콘
+
+| 상태 | 호스트명 | OS 아이콘 | 배경색 |
+|------|---------|-----------|--------|
+| 로컬 | 로컬 hostname | 로컬 OS 기반 | surface0 |
+| 원격 + dotfiles | 원격 hostname | WEZTERM_OS 기반 | accent (호스트별) |
+| 원격 - dotfiles | 원격 hostname | Linux (기본) | accent (호스트별) |
 
 ### 셸 측 설정 (`zsh/.zshrc`)
 
 ```zsh
-# WezTerm: broadcast hostname via user var on every prompt
+# WezTerm: broadcast host info via user vars on every prompt
+# Re-emitting on precmd ensures values reset after exiting SSH
 _wezterm_host_b64="$(echo -n "$(hostname -s)" | base64)"
-_wezterm_set_host() { printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_HOST "$_wezterm_host_b64"; }
-precmd_functions+=(_wezterm_set_host)
+_wezterm_os_b64="$(echo -n "$(uname -s)" | base64)"
+_wezterm_set_vars() {
+    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_HOST "$_wezterm_host_b64"
+    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_OS "$_wezterm_os_b64"
+    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_CWD \
+        "$(printf '%s' "${PWD/#$HOME/~}" | base64)"
+}
+precmd_functions+=(_wezterm_set_vars)
 ```
 
-- **OSC 1337 SetUserVar**: WezTerm이 인식하는 이스케이프 시퀀스. 다른 터미널에서는 무시됨
-- **precmd 훅**: SSH 종료 후 로컬 셸로 돌아올 때 즉시 로컬 hostname으로 복구
-- **base64 사전 계산**: 셸 시작 시 한 번만 계산, precmd에서는 가벼운 printf만 실행
-
-### 색상 할당 (`theme.lua`)
-
-- 6색 팔레트: sapphire, green, lavender, peach, flamingo, yellow
-- 호스트별 해시 → 선호 색상 선택 → 중복 시 다음 색상으로 이동
-- 활성 탭: 색상 배경 + 어두운 글자 (눈에 띔)
-- 비활성 탭: 어두운 배경 + 색상 글자 (은은하게 유지)
+- **OSC 1337 SetUserVar**: WezTerm 전용 이스케이프 시퀀스. 다른 터미널에서는 무시됨
+- **precmd 훅**: SSH 종료 후 로컬 셸로 돌아올 때 즉시 로컬 값으로 복구
+- **base64 사전 계산**: HOST/OS는 셸 시작 시 1회, CWD만 매 프롬프트마다 계산
 
 ### 새 기기 추가 시
 
@@ -173,6 +219,8 @@ precmd_functions+=(_wezterm_set_host)
 ```bash
 git clone <repo> ~/dotfiles && bash ~/dotfiles/init.sh
 ```
+
+dotfiles 없는 서버도 title 패턴 감지로 호스트/CWD가 동작한다 (Linux 한정).
 
 ## Configuration Files
 
