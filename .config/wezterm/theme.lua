@@ -209,9 +209,14 @@ function M.apply(config, is_macos)
         local display_host = remote or local_host
         local os_icon
         if remote then
-            local uv = pane:get_user_vars() or {}
-            local remote_os = uv.WEZTERM_OS or ''
-            os_icon = remote_os == 'Darwin' and '\u{f0035}' or '\u{f17c}'
+            local title = pane:get_title() or ''
+            if title:match('^%S+@[%w%-%._]+:') then
+                -- "user@host:" title format is Linux-only
+                os_icon = '\u{f17c}'
+            else
+                local remote_os = (pane:get_user_vars() or {}).WEZTERM_OS or ''
+                os_icon = remote_os == 'Darwin' and '\u{f0035}' or '\u{f17c}'
+            end
         else
             os_icon = is_macos and '\u{f0035}' or '\u{f17c}'
         end
