@@ -94,17 +94,7 @@ else
     fi
 fi
 
-# ---- Set zsh as default shell ----
-ZSH_PATH="$(which zsh)"
-if [[ "$(getent passwd "$USER" | cut -d: -f7)" != "$ZSH_PATH" ]]; then
-    echo "  Changing default shell to zsh..."
-    chsh -s "$ZSH_PATH"
-    echo "  ✅ Default shell changed to zsh"
-else
-    echo "  ✅ Default shell is already zsh"
-fi
-
-# ---- Symlink shared .zshrc ----
+# ---- Symlink shared .zshrc (before chsh so zsh startup works immediately) ----
 ln -sf "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
 echo "  Linked .zshrc"
 
@@ -126,3 +116,22 @@ TMPL
 fi
 ln -sf "$LOCAL_FILE" "$HOME/.zshrc.local"
 echo "  Linked .zshrc.local -> .zshrc.local.$HOSTNAME"
+
+# ---- Set zsh as default shell (last: chsh may prompt for password) ----
+ZSH_PATH="$(which zsh)"
+CURRENT_SHELL="$(basename "$SHELL")"
+if [[ "$CURRENT_SHELL" != "zsh" ]]; then
+    # Ensure zsh is in /etc/shells (required by chsh)
+    if ! grep -qx "$ZSH_PATH" /etc/shells 2>/dev/null; then
+        echo "  Adding $ZSH_PATH to /etc/shells..."
+        echo "$ZSH_PATH" | sudo tee -a /etc/shells >/dev/null
+    fi
+    echo "  Changing default shell to zsh..."
+    if chsh -s "$ZSH_PATH"; then
+        echo "  ✅ Default shell changed to zsh (restart session to apply)"
+    else
+        echo "  ⚠ chsh failed. Run manually: chsh -s $ZSH_PATH"
+    fi
+else
+    echo "  ✅ Default shell is already zsh"
+fi
