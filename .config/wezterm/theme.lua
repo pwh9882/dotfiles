@@ -1,5 +1,6 @@
 -- theme.lua — Colors, tab badge, status bar, window title
 local wezterm = require 'wezterm'
+local logic = require 'theme_logic'
 local M = {}
 
 -- ---- Catppuccin Mocha palette ----
@@ -35,40 +36,12 @@ function M.apply(config, is_macos)
         },
     }
 
-    -- Shorten path: ~/projects/myapp/src → ~/p/m/src
-    local function shorten_path(path)
-        local parts = {}
-        for seg in path:gmatch('[^/]+') do table.insert(parts, seg) end
-        if #parts <= 1 then return path end
-        local prefix = path:sub(1, 1) == '/' and '/' or ''
-        for i = 1, #parts - 1 do
-            if parts[i] ~= '~' then
-                parts[i] = parts[i]:sub(1, 1)
-            end
-        end
-        return prefix .. table.concat(parts, '/')
-    end
-
     local accents = { c.sapphire, c.green, c.lavender, c.peach, c.flamingo, c.yellow }
     local local_host = wezterm.hostname():match('^([^%.]+)') or ''
     local pane_cwd_cache = {}
 
-    -- Detect remote hostname from title + user_vars (nil = local)
-    --   1) title patterns: "host ❐ ..." (Oh My Tmux), "user@host[: ...]" (Linux SSH)
-    --   2) user_vars.WEZTERM_HOST fallback (macOS SSH where title has no hostname)
     local function detect_remote(title, uv)
-        local h = title:match('^(%S+)%s+❐')
-              or title:match('^%S+@([%w%-%._]+)')
-        if h and h ~= local_host then return h end
-        h = uv and uv.WEZTERM_HOST or nil
-        if h and h ~= '' and h ~= local_host then return h end
-        return nil
-    end
-
-    local function hash_idx(s)
-        local h = 0
-        for i = 1, #s do h = h + string.byte(s, i) end
-        return (h % #accents) + 1
+        return logic.detect_remote(title, uv, local_host)
     end
 
     -- Tab title (Color Badge Style)
@@ -84,7 +57,7 @@ function M.apply(config, is_macos)
             local h = detect_remote(t.active_pane.title or '', t.active_pane.user_vars or {})
             if t.tab_id == tab.tab_id then my_host = h end
             if h and not host_colors[h] then
-                local idx = hash_idx(h)
+                local idx = logic.hash_idx(h, #accents)
                 for _ = 1, #accents do
                     if not used[idx] then break end
                     idx = (idx % #accents) + 1
@@ -95,9 +68,7 @@ function M.apply(config, is_macos)
         end
         local badge = my_host and host_colors[my_host] or c.mauve
 
-        -- Strip hostname prefixes from title
-        title = title:gsub('^%S+%s+❐%s*', '')           -- Oh My Tmux: #h ❐ #S ● #I #W
-        title = title:gsub('^%S+@[%w%-%._]+[:%s]*', '') -- SSH shell: user@host[: path]
+        title = logic.strip_title(title)
         local idx = tostring(tab.tab_index + 1)
 
         if tab.is_active then
@@ -127,33 +98,16 @@ function M.apply(config, is_macos)
         local uv = pane:get_user_vars() or {}
         local remote = detect_remote(title, uv)
         local pid = tostring(pane:pane_id())
-        local cwd
 
-        if remote then
-            -- 1) Title path extraction (most reliable: user@host: /path)
-            cwd = title:match('^%S+@[%w%-%._]+:%s*(.+)')
-            -- 2) Fallback: WEZTERM_CWD if host matches (macOS SSH with dotfiles)
-            if not cwd or cwd == '' then
-                local uv_host = uv.WEZTERM_HOST or ''
-                if uv_host == remote and uv.WEZTERM_CWD and uv.WEZTERM_CWD ~= '' then
-                    cwd = uv.WEZTERM_CWD
-                end
-            end
-            -- 3) Cache for tmux etc. where title changes and path disappears
-            if cwd and cwd ~= '' then
-                pane_cwd_cache[pid] = cwd
-            else
-                cwd = pane_cwd_cache[pid]
-            end
-        else
-            cwd = uv.WEZTERM_CWD
+        local workspace = window:active_workspace():gsub('%c', '')
+        local cwd, cache_val = logic.resolve_cwd(
+            remote, title, uv, pane_cwd_cache[pid], workspace)
+        if cache_val then
+            pane_cwd_cache[pid] = cache_val
+        elseif not remote then
             pane_cwd_cache[pid] = nil
         end
-
-        if not cwd or cwd == '' then
-            cwd = remote or window:active_workspace():gsub('%c', '')
-        end
-        cwd = shorten_path(cwd)
+        cwd = logic.shorten_path(cwd)
 
         local right = {}
 
@@ -189,21 +143,15 @@ function M.apply(config, is_macos)
         table.insert(right, { Attribute = { Intensity = 'Normal' } })
         table.insert(right, { Text = ' ' .. wezterm.strftime('%H:%M') .. ' ' })
 
-        -- Host + OS icon (reuse remote/title/uv from above)
+        -- Host + OS icon
         local display_host = remote or local_host
-        local os_icon
+        local os_kind = logic.detect_os(remote, title, uv, is_macos)
+        local os_icon = os_kind == 'darwin' and '\u{f0035}' or '\u{f17c}'
         if remote then
-            if title:match('^%S+@[%w%-%._]+:') then
-                -- "user@host:" title format is Linux-only
-                os_icon = '\u{f17c}'
-            else
-                os_icon = (uv.WEZTERM_OS or '') == 'Darwin' and '\u{f0035}' or '\u{f17c}'
-            end
-            local host_color = accents[hash_idx(remote)]
+            local host_color = accents[logic.hash_idx(remote, #accents)]
             table.insert(right, { Background = { Color = host_color } })
             table.insert(right, { Foreground = { Color = c.crust } })
         else
-            os_icon = is_macos and '\u{f0035}' or '\u{f17c}'
             table.insert(right, { Background = { Color = c.surface0 } })
             table.insert(right, { Foreground = { Color = c.fg } })
         end
