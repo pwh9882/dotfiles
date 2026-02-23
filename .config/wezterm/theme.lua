@@ -39,6 +39,8 @@ function M.apply(config, is_macos)
     local accents = { c.sapphire, c.green, c.lavender, c.peach, c.flamingo, c.yellow }
     local local_host = wezterm.hostname():match('^([^%.]+)') or ''
     local pane_cwd_cache = {}
+    local pane_host_cache = {}
+    local pane_os_cache = {}
 
     local function detect_remote(title, uv)
         return logic.detect_remote(title, uv, local_host)
@@ -96,8 +98,39 @@ function M.apply(config, is_macos)
     wezterm.on('update-status', function(window, pane)
         local title = pane:get_title() or ''
         local uv = pane:get_user_vars() or {}
-        local remote = detect_remote(title, uv)
         local pid = tostring(pane:pane_id())
+
+        -- Host detection with cache:
+        -- Once a remote host is detected, cache it. Only clear when
+        -- positively identified as local (WEZTERM_HOST matches local).
+        local fresh_remote = detect_remote(title, uv)
+        local remote
+        if fresh_remote then
+            pane_host_cache[pid] = fresh_remote
+            remote = fresh_remote
+        else
+            local uv_host = uv.WEZTERM_HOST or ''
+            if uv_host == '' or uv_host == local_host then
+                -- Positively local: clear cache
+                pane_host_cache[pid] = nil
+                pane_os_cache[pid] = nil
+            end
+            remote = pane_host_cache[pid]
+        end
+
+        -- OS detection with cache:
+        -- Title-based Linux detection is definitive. Cache it so
+        -- running programs (claude, vim) that change the title don't
+        -- revert the icon to Apple.
+        if remote then
+            local os_kind = logic.detect_os(remote, title, uv, is_macos)
+            if logic.is_linux_title(title) then
+                pane_os_cache[pid] = 'linux'
+            elseif (uv.WEZTERM_HOST or '') == remote and (uv.WEZTERM_OS or '') ~= '' then
+                pane_os_cache[pid] = os_kind
+            end
+            -- pane_os_cache[pid] keeps previous value if no strong signal
+        end
 
         local workspace = window:active_workspace():gsub('%c', '')
         local cwd, cache_val = logic.resolve_cwd(
@@ -143,9 +176,11 @@ function M.apply(config, is_macos)
         table.insert(right, { Attribute = { Intensity = 'Normal' } })
         table.insert(right, { Text = ' ' .. wezterm.strftime('%H:%M') .. ' ' })
 
-        -- Host + OS icon
+        -- Host + OS icon (use cached values)
         local display_host = remote or local_host
-        local os_kind = logic.detect_os(remote, title, uv, is_macos)
+        local os_kind = pane_os_cache[pid]
+            or (remote and logic.detect_os(remote, title, uv, is_macos))
+            or (is_macos and 'darwin' or 'linux')
         local os_icon = os_kind == 'darwin' and '\u{f0035}' or '\u{f17c}'
         if remote then
             local host_color = accents[logic.hash_idx(remote, #accents)]
