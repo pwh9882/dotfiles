@@ -35,9 +35,26 @@ function M.apply(config, is_macos)
         },
     }
 
+    -- Shorten path: ~/projects/myapp/src → ~/p/m/src
+    local function shorten_path(path)
+        local parts = {}
+        for seg in path:gmatch('[^/]+') do table.insert(parts, seg) end
+        if #parts <= 1 then return path end
+        local prefix = path:sub(1, 1) == '/' and '/' or ''
+        for i = 1, #parts - 1 do
+            if parts[i] ~= '~' then
+                parts[i] = parts[i]:sub(1, 1)
+            end
+        end
+        return prefix .. table.concat(parts, '/')
+    end
+
     -- Accent colors for hostname-based badge coloring
     local accents = { c.sapphire, c.green, c.lavender, c.peach, c.flamingo, c.yellow }
     local local_host = wezterm.hostname():match('^([^%.]+)') or ''
+
+    -- Per-pane CWD cache (survives title changes like entering tmux)
+    local pane_cwd_cache = {}
 
     local function detect_host(pane_info)
         -- 1) Pane title patterns (most up-to-date for nested SSH)
@@ -81,14 +98,9 @@ function M.apply(config, is_macos)
         local host = detect_host(tab.active_pane)
         local badge = host and host_colors[host] or c.mauve
 
-        -- For remote panes: use WEZTERM_CWD if available, otherwise strip hostname
-        local uv = tab.active_pane.user_vars or {}
-        if host and uv.WEZTERM_CWD and uv.WEZTERM_CWD ~= '' then
-            title = uv.WEZTERM_CWD
-        else
-            title = title:gsub('^%S+%s+❐%s*', '')           -- Oh My Tmux: #h ❐ #S ● #I #W
-            title = title:gsub('^%S+@[%w%-%._]+[:%s]*', '') -- SSH shell: user@host[: path]
-        end
+        -- Strip hostname prefixes from title
+        title = title:gsub('^%S+%s+❐%s*', '')           -- Oh My Tmux: #h ❐ #S ● #I #W
+        title = title:gsub('^%S+@[%w%-%._]+[:%s]*', '') -- SSH shell: user@host[: path]
         local idx = tostring(tab.tab_index + 1)
 
         if tab.is_active then
@@ -126,7 +138,37 @@ function M.apply(config, is_macos)
 
     -- Status bar (flat blocks)
     wezterm.on('update-status', function(window, pane)
-        local workspace = window:active_workspace():gsub('%c', '')
+        local uv = pane:get_user_vars() or {}
+        local remote = detect_host_from_pane(pane)
+        local pid = tostring(pane:pane_id())
+        local cwd
+
+        if remote then
+            -- 1) Title path extraction (most reliable: user@host: /path)
+            local title = pane:get_title() or ''
+            cwd = title:match('^%S+@[%w%-%._]+:%s*(.+)')
+            -- 2) Fallback: WEZTERM_CWD if host matches (macOS SSH with dotfiles)
+            if not cwd or cwd == '' then
+                local uv_host = uv.WEZTERM_HOST or ''
+                if uv_host == remote and uv.WEZTERM_CWD and uv.WEZTERM_CWD ~= '' then
+                    cwd = uv.WEZTERM_CWD
+                end
+            end
+            -- 3) Cache for tmux etc. where title changes and path disappears
+            if cwd and cwd ~= '' then
+                pane_cwd_cache[pid] = cwd
+            else
+                cwd = pane_cwd_cache[pid]
+            end
+        else
+            cwd = uv.WEZTERM_CWD
+            pane_cwd_cache[pid] = nil
+        end
+
+        if not cwd or cwd == '' then
+            cwd = remote or window:active_workspace():gsub('%c', '')
+        end
+        cwd = shorten_path(cwd)
 
         local right = {}
 
@@ -150,11 +192,11 @@ function M.apply(config, is_macos)
             table.insert(right, { Text = mode.text })
         end
 
-        -- Workspace
+        -- CWD (falls back to workspace name if WEZTERM_CWD not set)
         table.insert(right, { Background = { Color = c.surface0 } })
         table.insert(right, { Foreground = { Color = c.fg } })
         table.insert(right, { Attribute = { Intensity = 'Bold' } })
-        table.insert(right, { Text = ' \u{eb45} ' .. workspace .. ' ' })
+        table.insert(right, { Text = ' \u{eb45} ' .. cwd .. ' ' })
 
         -- Time
         table.insert(right, { Background = { Color = c.mantle } })
