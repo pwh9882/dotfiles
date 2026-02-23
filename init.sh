@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+cd "$(dirname "$0")"
 echo "🚀 Initializing all dotfiles..."
 
 for dir in */ ; do
