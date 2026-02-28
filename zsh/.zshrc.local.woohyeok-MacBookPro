@@ -40,3 +40,8 @@ export AWS_PROFILE=ddpslab
 
 # ---- Antigravity ----
 export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
+
+
+# ---- Alias ----
+alias stop-globalprotect="launchctl unload /Library/LaunchAgents/com.paloaltonetworks.gp.pangp*"
+alias start-globalprotect="launchctl load /Library/LaunchAgents/com.paloaltonetworks.gp.pangp*"

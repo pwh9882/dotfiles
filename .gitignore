@@ -3,7 +3,9 @@
 
 # Runtime / application-generated
 .config/iterm2/
-.config/karabiner/
+.config/karabiner/automatic_backups/
+.config/wezterm/wezterm.lua.backup
+.config/wezterm/project_history.txt
 .config/zed/embeddings/
 .config/zed/conversations/
 .config/zed/prompts/
