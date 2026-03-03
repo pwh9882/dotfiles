@@ -69,6 +69,9 @@ command -v zoxide &>/dev/null && eval "$(zoxide init zsh)"
 # True color support
 export COLORTERM=truecolor
 
+# Claude Code: use Sonnet instead of Haiku for subagent calls
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=claude-sonnet-4-6
+
 # ---- Secrets (gitignored, 기기별 민감 환경변수) ----
 [[ -f "$HOME/.zshenv.secrets" ]] && source "$HOME/.zshenv.secrets"
 
