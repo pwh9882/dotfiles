@@ -102,7 +102,7 @@ function M.apply(config)
 
     wezterm.on("smart_workspace_switcher.workspace_switcher.selected", function(window, path, label)
         resurrect.state_manager.save_state(resurrect.workspace_state.get_workspace_state())
-        resurrect.state_manager.write_current_state(label, "workspace")
+        resurrect.state_manager.write_current_state(path, "workspace")
     end)
 
     wezterm.on("augment-command-palette", function(window, pane)
