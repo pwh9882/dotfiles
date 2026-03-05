@@ -2,6 +2,9 @@
 local wezterm = require 'wezterm'
 local M = {}
 
+-- 셸 프로세스 이름 (login shell의 "-zsh" 포함)
+local shell_procs = { ["-zsh"] = true, ["zsh"] = true, ["-bash"] = true, ["bash"] = true, ["-fish"] = true, ["fish"] = true }
+
 function M.apply(config)
     local resurrect = wezterm.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
     local workspace_switcher = wezterm.plugin.require("https://github.com/MLFlexer/smart_workspace_switcher.wezterm")
@@ -33,7 +36,11 @@ function M.apply(config)
                 relative = true,
                 restore_text = true,
                 close_open_tabs = true,
-                on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+                on_pane_restore = function(pane, proc)
+                        if not shell_procs[proc] then
+                            resurrect.tab_state.default_on_pane_restore(pane, proc)
+                        end
+                    end,
             }
             if type == "workspace" then
                 local state = resurrect.state_manager.load_state(id, "workspace")
@@ -79,7 +86,11 @@ function M.apply(config)
                 restore_text = true,
                 resize_window = false,
                 close_open_tabs = true,
-                on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+                on_pane_restore = function(pane, proc)
+                        if not shell_procs[proc] then
+                            resurrect.tab_state.default_on_pane_restore(pane, proc)
+                        end
+                    end,
             })
         else
             local tab = window:active_tab()
