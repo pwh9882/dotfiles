@@ -19,6 +19,24 @@
 - **[Git](/git/)** - Git 전역 설정
 - **[Neofetch](/.config/neofetch/)** - 시스템 정보 표시
 
+## 🔀 Git Pull 전략
+
+이 레포는 `pull.rebase = true` + `rebase.autoStash = true`로 설정되어 있다.
+
+```bash
+git config pull.rebase true
+git config rebase.autoStash true
+```
+
+**왜 rebase인가?**
+- dotfiles는 단일 사용자 레포이므로 merge commit(`Merge branch 'main' of ...`)이 의미 없다
+- 여러 기기(Mac Mini, MacBook, WSL 등)에서 push/pull을 반복하면 불필요한 merge commit이 빠르게 쌓인다
+- rebase는 로컬 커밋을 remote 위에 올려놓아 히스토리를 선형으로 유지한다
+
+**왜 autoStash인가?**
+- 기기 간 동기화 시 uncommitted 변경사항이 있는 상태에서 pull하는 경우가 잦다
+- autoStash가 pull 전 자동 stash → pull 후 자동 unstash를 처리해준다
+
 ## 🚀 빠른 설치
 
 ```bash

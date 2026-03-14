@@ -76,6 +76,12 @@ export ANTHROPIC_DEFAULT_HAIKU_MODEL=claude-sonnet-4-6
 # ---- Secrets (gitignored, 기기별 민감 환경변수) ----
 [[ -f "$HOME/.zshenv.secrets" ]] && source "$HOME/.zshenv.secrets"
 
+# ---- Dotfiles auto-sync (background pull) ----
+DOTFILES_DIR="${${(%):-%x}:A:h:h}"
+if [[ -d "$DOTFILES_DIR/.git" ]]; then
+    git -C "$DOTFILES_DIR" pull --quiet &>/dev/null &!
+fi
+
 # ---- Load machine-specific config ----
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
 
@@ -99,3 +105,6 @@ else
     # macOS / Native Linux: Bitwarden Desktop 앱의 SSH Agent 소켓
     export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"
 fi
+
+# OpenClaw Completion
+source "/Users/woohyeok/.openclaw/completions/openclaw.zsh"
