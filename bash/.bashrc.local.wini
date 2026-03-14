@@ -1,0 +1,8 @@
+# ============================================================
+# Machine-specific config for: wini
+# ============================================================
+
+# ---- Linuxbrew (if installed) ----
+# if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+#     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+# fi
