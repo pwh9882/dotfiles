@@ -11,5 +11,8 @@
 .config/zed/prompts/
 .config/zed/settings_backup.json
 
+# Claude Code local settings
+.claude/settings.local.json
+
 # Secrets
 *.secrets
