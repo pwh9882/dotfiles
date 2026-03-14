@@ -62,7 +62,7 @@ command -v starship &>/dev/null && eval "$(starship init zsh)"
 
 # zoxide
 command -v zoxide &>/dev/null && eval "$(zoxide init zsh)"
-eval "$(zoxide init zsh --cmd cd)"
+command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)"
 
 # uv / cargo env
 [ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"

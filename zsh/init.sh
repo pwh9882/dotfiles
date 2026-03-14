@@ -46,7 +46,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         setup_brew
     fi
 
-    BREW_PACKAGES=(zsh-autosuggestions zsh-syntax-highlighting starship zoxide lsd)
+    BREW_PACKAGES=(zsh-autosuggestions zsh-syntax-highlighting starship zoxide lsd fzf)
     for pkg in "${BREW_PACKAGES[@]}"; do
         if ! brew list "$pkg" &>/dev/null; then
             echo "  Installing $pkg..."
@@ -81,6 +81,16 @@ else
     if ! command -v zoxide &>/dev/null; then
         echo "  Installing zoxide..."
         curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+    fi
+
+    # fzf (required for zoxide interactive mode)
+    if ! command -v fzf &>/dev/null; then
+        echo "  Installing fzf..."
+        if command -v apt-get &>/dev/null; then
+            sudo apt-get install -y fzf 2>/dev/null || echo "  ⚠ fzf not available via apt"
+        elif command -v pacman &>/dev/null; then
+            sudo pacman -S --noconfirm fzf
+        fi
     fi
 
     # lsd
