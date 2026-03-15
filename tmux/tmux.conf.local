@@ -398,12 +398,9 @@ bind -T copy-mode MouseDown1Pane select-pane \; send-keys -X clear-selection #!i
 # force Vi mode (y로 복사 등 vi 키바인딩 활성화)
 set -g mode-keys vi
 
-# replace C-b by C-a instead of using both prefixes
-# set -gu prefix2
-# unbind C-a
-# unbind C-b
-# set -g prefix C-a
-# bind C-a send-prefix
+# disable secondary prefix so only C-b is used
+set -gu prefix2 #!important
+unbind C-a #!important
 
 # if you don't want Oh my tmux! to alter a binding or a setting, use #!important
 # bind c new-window -c '#{pane_current_path}' #!important

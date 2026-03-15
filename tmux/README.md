@@ -12,7 +12,7 @@ tmux 설치 + Oh My Tmux 클론 + 설정 심링크가 자동으로 진행됩니�
 
 ## 키바인딩
 
-prefix: `Ctrl+b` 또는 `Ctrl+a`
+prefix: `Ctrl+b`
 
 ### 세션
 
