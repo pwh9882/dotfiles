@@ -60,10 +60,6 @@ precmd_functions+=(_wezterm_set_vars)
 # starship prompt
 command -v starship &>/dev/null && eval "$(starship init zsh)"
 
-# zoxide
-command -v zoxide &>/dev/null && eval "$(zoxide init zsh)"
-command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)"
-
 # uv / cargo env
 [ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"
 
@@ -108,3 +104,7 @@ fi
 
 # OpenClaw Completion
 source "/Users/woohyeok/.openclaw/completions/openclaw.zsh"
+
+# zoxide (must be at the end of .zshrc)
+command -v zoxide &>/dev/null && eval "$(zoxide init zsh)"
+command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)"
