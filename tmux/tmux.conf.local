@@ -69,7 +69,7 @@ tmux_conf_new_pane_reconnect_ssh=false
 # automatic detection relies on the COLORTERM environment variable being defined
 # to 'truecolor' or '24bit' or '$ tput colors' answering '16777216'
 # see https://github.com/termstandard/colors
-tmux_conf_24b_colour=auto
+tmux_conf_24b_colour=true
 
 
 # -- theming -------------------------------------------------------------------
@@ -381,10 +381,6 @@ tmux_conf_urlscan_options="--compact --dedupe"
 
 # increase history size
 #set -g history-limit 10000
-
-# true color (RGB) 지원
-set -ga terminal-overrides ",*256col*:RGB"
-set -ga terminal-overrides ",xterm*:RGB"
 
 # start with mouse mode enabled
 set -g mouse on
