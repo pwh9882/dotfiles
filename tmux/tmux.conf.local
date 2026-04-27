@@ -382,6 +382,10 @@ tmux_conf_urlscan_options="--compact --dedupe"
 # increase history size
 #set -g history-limit 10000
 
+# true color (RGB) 지원
+set -ga terminal-overrides ",*256col*:RGB"
+set -ga terminal-overrides ",xterm*:RGB"
+
 # start with mouse mode enabled
 set -g mouse on
 
@@ -394,6 +398,10 @@ bind -T copy-mode MouseDragEnd1Pane send-keys -X copy-selection-no-clear #!impor
 # 클릭 시: 기존 선택 해제 (클릭+스크롤로 새 선택 안 되게)
 bind -T copy-mode-vi MouseDown1Pane select-pane \; send-keys -X clear-selection #!important
 bind -T copy-mode MouseDown1Pane select-pane \; send-keys -X clear-selection #!important
+
+# ctrl b <> 으로 윈도우 밀기
+bind-key S-Left swap-window -t -1\; select-window -t -1
+bind-key S-Right swap-window -t +1\; select-window -t +1
 
 # force Vi mode (y로 복사 등 vi 키바인딩 활성화)
 set -g mode-keys vi
