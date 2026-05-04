@@ -1,0 +1,12 @@
+# ============================================================
+# Machine-specific config for: ddps-srv-2
+# ============================================================
+
+# ---- Linuxbrew (if installed) ----
+# if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+#     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+# fi
+
+# ---- npm user-global prefix (sudo 없이 -g 설치) ----
+# prefix는 ~/.npmrc 에 설정되어 있음 (prefix=$HOME/.npm-global)
+export PATH="$HOME/.npm-global/bin:$PATH"

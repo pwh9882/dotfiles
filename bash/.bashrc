@@ -22,6 +22,8 @@ shopt -s globstar 2>/dev/null
 # ---- Common Aliases ----
 alias v="nvim"
 command -v lsd &>/dev/null && alias ls="lsd"
+alias l="ls -F"
+alias la="ls -A"
 alias ll="ls -alhF"
 alias tf="terraform"
 alias cld="claude"

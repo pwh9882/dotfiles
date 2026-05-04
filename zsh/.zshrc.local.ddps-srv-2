@@ -1,0 +1,10 @@
+# ============================================================
+# Machine-specific config for: ddps-srv-2
+# ============================================================
+
+DEFAULT_USER=whpark
+
+# ---- Linuxbrew (if installed) ----
+# if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+#     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+# fi

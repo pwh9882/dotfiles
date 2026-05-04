@@ -15,6 +15,8 @@ source $ZSH/oh-my-zsh.sh
 # ---- Common Aliases ----
 alias v="nvim"
 command -v lsd &>/dev/null && alias ls="lsd"
+alias l="ls -F"
+alias la="ls -A"
 alias ll="ls -alhF"
 alias tf="terraform"
 alias cld="claude"
