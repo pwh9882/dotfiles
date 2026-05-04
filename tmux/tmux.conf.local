@@ -388,11 +388,6 @@ set -g mouse on
 # OSC 52 clipboard: 터미널(WezTerm)을 통해 클립보드 전파 (SSH, tmux 통과)
 set -g set-clipboard on
 
-# pass extended keys and terminal OSCs through to TUI apps (Claude Code, Vim, etc.)
-set -g allow-passthrough on
-set -s extended-keys on
-set -as terminal-features 'xterm*:extkeys'
-
 # 마우스 드래그 후: 선택 확정 + 하이라이트 유지 (스크롤해도 확장 안 됨)
 bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-no-clear #!important
 bind -T copy-mode MouseDragEnd1Pane send-keys -X copy-selection-no-clear #!important

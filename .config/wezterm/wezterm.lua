@@ -20,7 +20,6 @@ config.window_decorations = 'RESIZE'
 config.use_fancy_tab_bar = false
 config.tab_max_width = 60
 config.warn_about_missing_glyphs = false
-config.enable_kitty_keyboard = true
 
 if is_macos then
     config.font_size = 13

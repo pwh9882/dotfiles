@@ -38,6 +38,8 @@ function M.apply(config, is_macos)
             name = 'resize_panes', one_shot = false, timeout_milliseconds = 1000,
         }},
 
+        { key = 'Enter', mods = 'SHIFT', action = wezterm.action { SendString = "\x1b\r" } },
+
         -- tmux prefix indicator (Ctrl+B → pass through + show badge)
         { key = 'b', mods = 'CTRL', action = wezterm.action.Multiple({
             wezterm.action.SendKey { key = 'b', mods = 'CTRL' },
