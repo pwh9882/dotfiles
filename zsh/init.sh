@@ -4,6 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOSTNAME="$(hostname -s)"
 LOCAL_FILE="$SCRIPT_DIR/.zshrc.local.$HOSTNAME"
+ZSHENV_LOCAL_FILE="$SCRIPT_DIR/.zshenv.local.$HOSTNAME"
 
 # ---- Helper: detect and activate Homebrew ----
 setup_brew() {
@@ -103,6 +104,24 @@ else
         fi
     fi
 fi
+
+# ---- Symlink shared .zshenv (loaded by every zsh invocation) ----
+ln -sf "$SCRIPT_DIR/.zshenv" "$HOME/.zshenv"
+echo "  Linked .zshenv"
+
+# ---- Symlink machine-specific zsh environment ----
+if [[ ! -f "$ZSHENV_LOCAL_FILE" ]]; then
+    echo "  Creating .zshenv.local.$HOSTNAME..."
+    cat > "$ZSHENV_LOCAL_FILE" <<TMPL
+# ============================================================
+# Machine-specific zsh environment for: $HOSTNAME
+# Loaded by every zsh invocation. Keep this file minimal.
+# ============================================================
+
+TMPL
+fi
+ln -sf "$ZSHENV_LOCAL_FILE" "$HOME/.zshenv.local"
+echo "  Linked .zshenv.local -> .zshenv.local.$HOSTNAME"
 
 # ---- Symlink shared .zshrc (before chsh so zsh startup works immediately) ----
 ln -sf "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"

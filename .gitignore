@@ -16,3 +16,6 @@
 
 # Secrets
 *.secrets
+
+# zsh machine-local environment
+zsh/.zshenv.local.*
