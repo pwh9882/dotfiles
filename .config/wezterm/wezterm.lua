@@ -21,6 +21,10 @@ config.use_fancy_tab_bar = false
 config.tab_max_width = 60
 config.warn_about_missing_glyphs = false
 
+-- ---- Rendering (120Hz 고주사율 대응; 모니터 refresh rate를 안 넘게 자동 캡) ----
+config.max_fps = 120
+config.animation_fps = 60
+
 if is_macos then
     config.font_size = 13
     config.window_background_opacity = 0.85
