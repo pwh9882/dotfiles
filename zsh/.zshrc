@@ -104,9 +104,6 @@ else
     export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"
 fi
 
-# OpenClaw Completion
-source "/Users/woohyeok/.openclaw/completions/openclaw.zsh"
-
 # zoxide (must be at the end of .zshrc)
 command -v zoxide &>/dev/null && eval "$(zoxide init zsh)"
 command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)"

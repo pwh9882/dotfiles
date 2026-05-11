@@ -33,6 +33,3 @@ DEFAULT_USER=woohyeok
 export AWS_PROFILE=spotrank
 
 alias moltbot="clawdbot"
-
-# ---- OpenClaw Completion ----
-source "$HOME/.openclaw/completions/openclaw.zsh"
