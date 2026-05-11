@@ -29,6 +29,8 @@ if is_macos then
     config.font_size = 13
     config.window_background_opacity = 0.85
     config.macos_window_background_blur = 30
+    -- Apple Silicon: Metal 직접 사용 (OpenGL→Metal 변환 레이어 회피)
+    config.front_end = 'WebGpu'
     config.set_environment_variables = {
         PATH = '/opt/homebrew/bin:' .. os.getenv('PATH')
     }
