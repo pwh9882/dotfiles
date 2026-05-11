@@ -71,6 +71,21 @@ export COLORTERM=truecolor
 # Claude Code: use Sonnet instead of Haiku for subagent calls
 export ANTHROPIC_DEFAULT_HAIKU_MODEL=claude-sonnet-4-6
 
+# Claude Code: tmux 안에서 24-bit truecolor 강제 활성화
+#
+# v2.1.78에서 도입된 회귀 — $TMUX 감지 시 chalk.level을 무조건 2(256색)로
+# 강제 다운그레이드하는 defensive clamp가 src/ink/colorize.ts의
+# clampChalkLevelForTmux()에 추가됨. VS Code/Cursor 등 truecolor 미선언
+# 빌트인 터미널의 washed-out 픽스가, 정상 셋업된 WezTerm/Ghostty + tmux
+# 사용자까지 전부 다운그레이드시키는 부작용 (mascot이 pink로 보이는 등).
+# 이 env가 셋팅돼 있으면 그 clamp 비활성화 → wezterm native와 동일 렌더링.
+#
+# 미문서화이지만 코드에 명시적으로 존재. 회귀는 #35806에서 OPEN 유지 중,
+# 문서화 요청 #46146은 closed 후 docs 미반영. 향후 fix 정식 적용되면 제거.
+#   - https://github.com/anthropics/claude-code/issues/35806
+#   - https://github.com/anthropics/claude-code/issues/46146
+export CLAUDE_CODE_TMUX_TRUECOLOR=1
+
 # ---- Secrets (gitignored, 기기별 민감 환경변수) ----
 [[ -f "$HOME/.zshenv.secrets" ]] && source "$HOME/.zshenv.secrets"
 
