@@ -41,6 +41,10 @@ function M.apply(config, is_macos)
     local pane_cwd_cache = {}
     local pane_host_cache = {}
     local pane_os_cache = {}
+    local mode_labels = {
+        tmux_prefix  = { text = ' ^B ',     color = c.flamingo },
+        resize_panes = { text = ' RESIZE ', color = c.peach },
+    }
 
     local function detect_remote(title, uv)
         return logic.detect_remote(title, uv, local_host)
@@ -49,26 +53,8 @@ function M.apply(config, is_macos)
     -- Tab title (Color Badge Style)
     wezterm.on('format-tab-title', function(tab, tabs, panes, cfg, hover, max_width)
         local title = tab.active_pane.title or ''
-
-        -- Assign unique badge colors per hostname (hash + collision avoidance)
-        -- Also find current tab's host in the same pass
-        local host_colors = {}
-        local used = {}
-        local my_host
-        for _, t in ipairs(tabs) do
-            local h = detect_remote(t.active_pane.title or '', t.active_pane.user_vars or {})
-            if t.tab_id == tab.tab_id then my_host = h end
-            if h and not host_colors[h] then
-                local idx = logic.hash_idx(h, #accents)
-                for _ = 1, #accents do
-                    if not used[idx] then break end
-                    idx = (idx % #accents) + 1
-                end
-                used[idx] = true
-                host_colors[h] = accents[idx]
-            end
-        end
-        local badge = my_host and host_colors[my_host] or c.mauve
+        local remote = detect_remote(title, tab.active_pane.user_vars or {})
+        local badge = remote and accents[logic.hash_idx(remote, #accents)] or c.mauve
 
         title = logic.strip_title(title)
         local idx = tostring(tab.tab_index + 1)
@@ -146,10 +132,6 @@ function M.apply(config, is_macos)
 
         -- Mode indicator (leader / key table)
         local key_table = window:active_key_table()
-        local mode_labels = {
-            tmux_prefix  = { text = ' ^B ',     color = c.flamingo },
-            resize_panes = { text = ' RESIZE ', color = c.peach },
-        }
 
         if window:leader_is_active() then
             table.insert(right, { Background = { Color = c.yellow } })

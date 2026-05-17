@@ -1,6 +1,11 @@
 local wezterm = require 'wezterm'
 local module = {}
 
+local DEBUG = false
+local PROJECT_CACHE_TTL_SECONDS = 30
+local project_cache
+local project_cache_time = 0
+
 -- Simple persistent history (LRU) of recently used projects
 local config_dir = wezterm.config_dir or (wezterm.home_dir .. "/.config/wezterm")
 local history_path = config_dir .. "/project_history.txt"
@@ -72,6 +77,11 @@ local function get_ssh_hosts()
     return ssh_hosts
 end
 local function project_dirs()
+  local now = os.time()
+  if project_cache and (now - project_cache_time) < PROJECT_CACHE_TTL_SECONDS then
+    return project_cache
+  end
+
   -- Start with your home directory as a project, 'cause you might want
   -- to jump straight to it sometimes.
   local projects = { wezterm.home_dir }
@@ -99,6 +109,8 @@ local function project_dirs()
     table.insert(projects, "SSH:" .. host)
   end
 
+  project_cache = projects
+  project_cache_time = now
   return projects
 end
 
@@ -225,10 +237,10 @@ end
 -- Expose a helper so wezterm.lua can record recents on other switchers
 function module.record_current_as_recent(pane)
   local prev = current_project_id(pane)
-  if not prev then
+  if DEBUG and not prev then
     local uri = pane and pane:get_current_working_dir() or nil
     wezterm.log_info("recent-history: unresolved current project; uri=", tostring(uri))
-  else
+  elseif DEBUG then
     wezterm.log_info("recent-history: push ", prev, " -> ", history_path)
   end
   push_recent(prev)

@@ -20,6 +20,7 @@ config.window_decorations = 'RESIZE'
 config.use_fancy_tab_bar = false
 config.tab_max_width = 60
 config.warn_about_missing_glyphs = false
+config.status_update_interval = 5
 
 -- ---- Rendering (120Hz 고주사율 대응; 모니터 refresh rate를 안 넘게 자동 캡) ----
 config.max_fps = 120
