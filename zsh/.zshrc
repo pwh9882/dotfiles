@@ -3,12 +3,23 @@
 # Machine-specific settings go in .zshrc.local.<hostname>
 # ============================================================
 
-# Path to your oh-my-zsh installation.
+# Oh My Zsh
 export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME=""  # Prompt is managed by starship.
 
-ZSH_THEME="agnoster"
+plugins=(
+    git
+    colored-man-pages
+    command-not-found
+    sudo
+)
 
-plugins=(git)
+# Completion styles
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
+zstyle ':completion:*' menu select
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
+[[ -n "$LS_COLORS" ]] && zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 
 source $ZSH/oh-my-zsh.sh
 
@@ -36,13 +47,9 @@ if command -v brew &>/dev/null; then
     BREW_PREFIX="$(brew --prefix)"
     [[ -f "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] && \
         source "$BREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
-    [[ -f "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] && \
-        source "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 else
     [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && \
         source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-    [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && \
-        source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
 
 # kiro
@@ -91,9 +98,34 @@ export CLAUDE_CODE_TMUX_TRUECOLOR=1
 
 # ---- Dotfiles auto-sync (background pull) ----
 DOTFILES_DIR="${${(%):-%x}:A:h:h}"
-if [[ -d "$DOTFILES_DIR/.git" ]]; then
-    git -C "$DOTFILES_DIR" pull --quiet &>/dev/null &!
-fi
+_dotfiles_auto_sync() {
+    local cache_dir="$HOME/.cache"
+    local stamp_file="$cache_dir/dotfiles-autosync.last"
+    local lock_dir="$cache_dir/dotfiles-autosync.lock"
+    local interval=21600
+    local now last
+
+    [[ -d "$DOTFILES_DIR/.git" ]] || return
+    mkdir -p "$cache_dir" 2>/dev/null || return
+
+    now="$(date +%s)"
+    if [[ -r "$stamp_file" ]]; then
+        last="$(<"$stamp_file")"
+    else
+        last=0
+    fi
+    [[ "$last" == <-> ]] || last=0
+    (( now - last >= interval )) || return
+
+    (
+        mkdir "$lock_dir" 2>/dev/null || return
+        trap 'rmdir "$lock_dir" 2>/dev/null' EXIT
+
+        [[ -z "$(git -C "$DOTFILES_DIR" status --porcelain 2>/dev/null)" ]] || return
+        git -C "$DOTFILES_DIR" pull --ff-only --quiet &>/dev/null && print -r -- "$now" >| "$stamp_file"
+    ) &>/dev/null &
+}
+_dotfiles_auto_sync
 
 # ---- Load machine-specific config ----
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
@@ -119,6 +151,12 @@ else
     export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"
 fi
 
-# zoxide (must be at the end of .zshrc)
-command -v zoxide &>/dev/null && eval "$(zoxide init zsh)"
+# zoxide
 command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)"
+
+# zsh-syntax-highlighting should be sourced last.
+if [[ -n "$BREW_PREFIX" && -f "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
+    source "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+elif [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
+    source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+fi
