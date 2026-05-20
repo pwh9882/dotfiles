@@ -118,12 +118,13 @@ _dotfiles_auto_sync() {
     (( now - last >= interval )) || return
 
     (
-        mkdir "$lock_dir" 2>/dev/null || return
+        mkdir "$lock_dir" 2>/dev/null || exit 0
         trap 'rmdir "$lock_dir" 2>/dev/null' EXIT
 
-        [[ -z "$(git -C "$DOTFILES_DIR" status --porcelain 2>/dev/null)" ]] || return
+        [[ -z "$(git -C "$DOTFILES_DIR" status --porcelain 2>/dev/null)" ]] || exit 0
         git -C "$DOTFILES_DIR" pull --ff-only --quiet &>/dev/null && print -r -- "$now" >| "$stamp_file"
-    ) &>/dev/null &
+        exit 0
+    ) &>/dev/null &!
 }
 _dotfiles_auto_sync
 
