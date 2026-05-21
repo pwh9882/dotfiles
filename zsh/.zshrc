@@ -52,6 +52,11 @@ else
         source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 fi
 
+# nvm (Node Version Manager) — loads node/npm if ~/.nvm is present
+export NVM_DIR="$HOME/.nvm"
+[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
+[[ -s "$NVM_DIR/bash_completion" ]] && source "$NVM_DIR/bash_completion"
+
 # kiro
 [[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
 

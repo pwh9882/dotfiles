@@ -158,8 +158,13 @@ if [[ "$CURRENT_SHELL" != "zsh" ]]; then
     echo "  Changing default shell to zsh..."
     if chsh -s "$ZSH_PATH"; then
         echo "  ✅ Default shell changed to zsh (restart session to apply)"
+    elif sudo chsh -s "$ZSH_PATH" "$USER"; then
+        # chsh prompts for a password the account may not have (e.g. cloud
+        # images where login is key-based). Fall back to sudo, which works
+        # whenever the user has passwordless sudo.
+        echo "  ✅ Default shell changed to zsh via sudo (restart session to apply)"
     else
-        echo "  ⚠ chsh failed. Run manually: chsh -s $ZSH_PATH"
+        echo "  ⚠ chsh failed. Run manually: sudo chsh -s $ZSH_PATH $USER"
     fi
 else
     echo "  ✅ Default shell is already zsh"
