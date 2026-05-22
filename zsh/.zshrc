@@ -65,11 +65,16 @@ export NVM_DIR="$HOME/.nvm"
 _wezterm_host_b64="$(echo -n "$(hostname -s)" | base64)"
 _wezterm_os_b64="$(echo -n "$(uname -s)" | base64)"
 _wezterm_set_vars() {
+    # SSH/tmux/TUI sessions can disconnect before disabling terminal mouse modes.
+    # Reset them at the shell prompt so mouse movement/scroll does not leak as input.
+    printf "\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?1015l"
     printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_HOST "$_wezterm_host_b64"
     printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_OS "$_wezterm_os_b64"
     printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_CWD "$(printf '%s' "${PWD/#$HOME/~}" | base64)"
 }
 precmd_functions+=(_wezterm_set_vars)
+
+alias fixmouse='printf "\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?1015l"'
 
 # starship prompt
 command -v starship &>/dev/null && eval "$(starship init zsh)"
