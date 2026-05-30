@@ -1,7 +1,31 @@
 #!/bin/bash
-# Claude Code StatusLine - Starship-inspired with Catppuccin Mocha theme
-# Receives JSON from Claude Code via stdin
-# Dependencies: jq, git, gh (optional, for PR status)
+# Claude Code StatusLine — Starship-inspired, Catppuccin Mocha theme.
+# Reads the status JSON from Claude Code on stdin. Deps: jq, git, gh (optional, PR status).
+#
+# ── Layout ────────────────────────────────────────────────────────────────────
+#   L1  Claude:  <model> <1M badge> <effort> <✻thinking> <⚡fast> │ ctx <%> │
+#                <rate limits…> │ v<version>
+#   L2  Repo:    <branch> <git status> <#PR> │ <os> in <path>
+#   L3  Session: ✎ <session name | uuid> │ ↑ <uptime> │ +<added>/-<removed this session>
+#   L4  Prompt:  the last user prompt (dim), width-truncated
+#
+# ── Rate limits — needs decoding ──────────────────────────────────────────────
+#   Each window renders as:   ⟳ <time-to-reset> <quota-remaining %>      e.g.  ⟳ 4h 95%
+#   The old "5h"/"7d" text labels were dropped; the time-to-reset replaced them.
+#   Three INDEPENDENT colors, each a separate signal:
+#     ⟳     window identity:  sapphire = 5-hour window,  mauve = 7-day window.
+#     time  burn pace (spend speed vs time left in the window):
+#             green  quota will outlast the window — using it leisurely
+#             yellow a bit ahead of pace
+#             red    spending too fast — will run dry well before reset
+#           pace(): green if  qrem×window ≥ 100×time_left ;  yellow if ≥ 50× ;  else red.
+#     %     quota left (100 − used):  green plenty · yellow ~half · red almost gone.
+#   Read together: "⟳ 5m 10%" = quota nearly spent (red %) BUT resets in 5m (green time),
+#   so it's fine; "⟳ 7d 10%" (both red) = heavily spent with a whole week still to go.
+#
+# ── Other glyphs ──────────────────────────────────────────────────────────────
+#   ✻ thinking on   ⚡ fast mode   ↑ uptime   ✎ session name
+#   git status:  +N staged · !N modified · ?N untracked   ·   #N open PR
 
 set -f  # Disable globbing for safety
 
@@ -84,13 +108,13 @@ fmt_dur() {
     else printf '%dh%dm' "$(( s / 3600 ))" "$(( (s % 3600) / 60 ))"; fi
 }
 
-# Time remaining until an epoch: 50m / 4h50m / 2d6h
+# Coarse time remaining until an epoch (largest single unit): 45m / 4h / 7d
 fmt_until() {
     local rem=$(( ${1:-0} - $(date +%s) ))
     [ "$rem" -lt 0 ] && rem=0
     if   [ "$rem" -lt 3600 ];  then printf '%dm' "$(( rem / 60 ))"
-    elif [ "$rem" -lt 86400 ]; then printf '%dh%dm' "$(( rem / 3600 ))" "$(( (rem % 3600) / 60 ))"
-    else printf '%dd%dh' "$(( rem / 86400 ))" "$(( (rem % 86400) / 3600 ))"; fi
+    elif [ "$rem" -lt 86400 ]; then printf '%dh' "$(( rem / 3600 ))"
+    else printf '%dd' "$(( rem / 86400 ))"; fi
 }
 
 # Color by usage %: <50 green, <80 yellow, else red
@@ -101,8 +125,17 @@ pct_color() {
     else printf '%b' "$GREEN"; fi
 }
 
-# Emit N spaces (fixed-width padding for the locked grid)
-sp() { local n=${1:-0}; [ "$n" -gt 0 ] && printf '%*s' "$n" ''; }
+# Burn-pace color: compare quota-remaining vs time-remaining in the window.
+# Green when quota outlasts the time left (leisurely), red when spending too fast.
+# Args: used% · resets_at(epoch) · window_duration(sec).  ratio = qrem*wdur / (100*trem).
+pace_color() {
+    local used=${1:-0} trem=$(( ${2:-0} - $(date +%s) )) wdur=${3:-1}
+    [ "$trem" -lt 1 ] && trem=1   # about to reset → treat time as ~0 (no worries → green)
+    local qrem=$(( 100 - used ))
+    if   [ $(( qrem * wdur )) -ge $(( 100 * trem )) ]; then printf '%b' "$GREEN"
+    elif [ $(( qrem * wdur )) -ge $(( 50 * trem )) ];  then printf '%b' "$YELLOW"
+    else printf '%b' "$RED"; fi
+}
 
 # --- OS icon ---
 case "$(uname -s)" in
@@ -226,15 +259,17 @@ fi
 # Values hug their labels (tight); only the ⟳ countdown is back-padded so the
 # 7d column doesn't jitter every minute as it ticks down.
 L1_SEGS=("$CTX_SEG")
-# Rate limits show REMAINING (100 − used); color stays keyed to used so low-remaining = red.
+# Rate limits per window: <⟳ window-tint> <time-to-reset · pace-tint> <quota remaining % · usage-tint>.
+#   ⟳    color identifies the window (sapphire = 5h, mauve = 7d) now that the labels are gone.
+#   time color = burn pace: green if quota outlasts the time left, red if spending too fast.
+#   %    color = quota left: red when little remains.
 RL5_INT=${RL5_PCT%.*}
 if [ "${RL5_INT:--1}" -ge 0 ]; then
-    _r5=$(fmt_until "$RL5_RESET")
-    L1_SEGS+=("5h $(pct_color "$RL5_INT")$(( 100 - RL5_INT ))%${RESET} ${OVERLAY}⟳ ${_r5}${RESET}$(sp $((5 - ${#_r5})))")
+    L1_SEGS+=("${SAPPHIRE}⟳${RESET} $(pace_color "$RL5_INT" "$RL5_RESET" 18000)$(fmt_until "$RL5_RESET")${RESET} $(pct_color "$RL5_INT")$(( 100 - RL5_INT ))%${RESET}")
 fi
 RL7_INT=${RL7_PCT%.*}
 if [ "${RL7_INT:--1}" -ge 0 ]; then
-    L1_SEGS+=("7d $(pct_color "$RL7_INT")$(( 100 - RL7_INT ))%${RESET}")
+    L1_SEGS+=("${MAUVE}⟳${RESET} $(pace_color "$RL7_INT" "$RL7_RESET" 604800)$(fmt_until "$RL7_RESET")${RESET} $(pct_color "$RL7_INT")$(( 100 - RL7_INT ))%${RESET}")
 fi
 [ -n "$VERSION" ] && L1_SEGS+=("${OVERLAY}v${VERSION}${RESET}")
 
