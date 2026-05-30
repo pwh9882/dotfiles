@@ -8,20 +8,36 @@ set -f  # Disable globbing for safety
 # --- Input & Terminal ---
 INPUT=$(cat)
 
-TERM_WIDTH=$(stty size < /dev/tty 2>/dev/null | awk '{print $2}')
+# Claude Code (v2.1.153+) exports COLUMNS/LINES; fall back to stty.
+TERM_WIDTH=${COLUMNS:-$(stty size < /dev/tty 2>/dev/null | awk '{print $2}')}
 TERM_WIDTH=${TERM_WIDTH:-80}
 # Reserve ~35% right side for Claude Code notifications (updates, MCP errors, token warnings)
 MAX_WIDTH=$(( TERM_WIDTH * 65 / 100 ))
 
 # --- Parse JSON (single jq call) ---
-eval $(printf '%s' "$INPUT" | jq -r '
+eval "$(printf '%s' "$INPUT" | jq -r '
   "CWD=\(.cwd // "" | @sh)",
   "OUTPUT_STYLE=\(.output_style.name // "" | @sh)",
   "MODEL_NAME=\(.model.display_name // "" | @sh)",
-  "CTX_USED=\(.context_window.used_percentage // 0)",
+  "VERSION=\(.version // "" | @sh)",
   "SESSION_ID=\(.session_id // "" | @sh)",
-  "TRANSCRIPT=\(.transcript_path // "" | @sh)"
-')
+  "SESSION_NAME=\(.session_name // "" | @sh)",
+  "TRANSCRIPT=\(.transcript_path // "" | @sh)",
+  "EFFORT=\(.effort.level // "" | @sh)",
+  "THINKING=\(.thinking.enabled // false)",
+  "FAST=\(.fast_mode // false)",
+  "CTX_USED=\(.context_window.used_percentage // 0)",
+  "CTX_TOKENS=\(.context_window.total_input_tokens // 0)",
+  "CTX_SIZE=\(.context_window.context_window_size // 0)",
+  "COST=\(.cost.total_cost_usd // 0)",
+  "DUR_MS=\(.cost.total_duration_ms // 0)",
+  "LINES_ADD=\(.cost.total_lines_added // 0)",
+  "LINES_DEL=\(.cost.total_lines_removed // 0)",
+  "RL5_PCT=\(.rate_limits.five_hour.used_percentage // -1)",
+  "RL5_RESET=\(.rate_limits.five_hour.resets_at // 0)",
+  "RL7_PCT=\(.rate_limits.seven_day.used_percentage // -1)",
+  "RL7_RESET=\(.rate_limits.seven_day.resets_at // 0)"
+')"
 
 # --- Colors (Catppuccin Mocha, 256-color) ---
 MAUVE="\033[38;5;183m"
@@ -44,12 +60,49 @@ truncate() {
     fi
 }
 
-# Cross-platform file age in seconds (macOS + Linux)
+# Cross-platform file age in seconds (GNU/Linux first, then macOS BSD)
 file_age() {
     local mtime
-    mtime=$(stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0)
+    mtime=$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0)
+    case "$mtime" in ''|*[!0-9]*) mtime=0 ;; esac
     echo $(( $(date +%s) - mtime ))
 }
+
+# Compact token count: 51022 -> 51k, 1000000 -> 1M
+fmt_tok() {
+    local n=${1:-0}
+    if   [ "$n" -ge 1000000 ]; then printf '%dM' "$(( n / 1000000 ))"
+    elif [ "$n" -ge 1000 ];    then printf '%dk' "$(( n / 1000 ))"
+    else printf '%d' "$n"; fi
+}
+
+# Compact duration from ms: 45s / 7m / 1h5m
+fmt_dur() {
+    local s=$(( ${1:-0} / 1000 ))
+    if   [ "$s" -lt 60 ];   then printf '%ds' "$s"
+    elif [ "$s" -lt 3600 ]; then printf '%dm' "$(( s / 60 ))"
+    else printf '%dh%dm' "$(( s / 3600 ))" "$(( (s % 3600) / 60 ))"; fi
+}
+
+# Time remaining until an epoch: 50m / 4h50m / 2d6h
+fmt_until() {
+    local rem=$(( ${1:-0} - $(date +%s) ))
+    [ "$rem" -lt 0 ] && rem=0
+    if   [ "$rem" -lt 3600 ];  then printf '%dm' "$(( rem / 60 ))"
+    elif [ "$rem" -lt 86400 ]; then printf '%dh%dm' "$(( rem / 3600 ))" "$(( (rem % 3600) / 60 ))"
+    else printf '%dd%dh' "$(( rem / 86400 ))" "$(( (rem % 86400) / 3600 ))"; fi
+}
+
+# Color by usage %: <50 green, <80 yellow, else red
+pct_color() {
+    local p=${1:-0}
+    if   [ "$p" -ge 80 ]; then printf '%b' "$RED"
+    elif [ "$p" -ge 50 ]; then printf '%b' "$YELLOW"
+    else printf '%b' "$GREEN"; fi
+}
+
+# Emit N spaces (fixed-width padding for the locked grid)
+sp() { local n=${1:-0}; [ "$n" -gt 0 ] && printf '%*s' "$n" ''; }
 
 # --- OS icon ---
 case "$(uname -s)" in
@@ -68,6 +121,9 @@ case "$(uname -s)" in
     Darwin*) OS_ICON=$'\xf3\xb0\x80\xb5' ;;
     *)       OS_ICON=$'\xef\x84\x88' ;;
 esac
+
+# --- Model name (strip verbose "(1M context)" suffix; shown in ctx instead) ---
+MODEL_NAME=${MODEL_NAME% (*context)}
 
 # --- Directory ---
 DIR="$CWD"
@@ -108,6 +164,7 @@ if git -C "$CWD" rev-parse --git-dir > /dev/null 2>&1; then
         [ "${STAGED:-0}" -gt 0 ] && STATUS_STR="${STATUS_STR}+${STAGED}"
         [ "${MODIFIED:-0}" -gt 0 ] && STATUS_STR="${STATUS_STR} !${MODIFIED}"
         [ "${UNTRACKED:-0}" -gt 0 ] && STATUS_STR="${STATUS_STR} ?${UNTRACKED}"
+        STATUS_STR="${STATUS_STR# }"   # drop leading space when staged (+) is absent
         [ -n "$STATUS_STR" ] && GIT_STATUS=" ${YELLOW}${STATUS_STR}${RESET}"
 
         # PR status cache (60s TTL) - only if gh is available
@@ -139,11 +196,20 @@ fi
 STYLE_INDICATOR=""
 [ -n "$OUTPUT_STYLE" ] && [ "$OUTPUT_STYLE" != "default" ] && STYLE_INDICATOR=" [${OUTPUT_STYLE}]"
 
-# --- Context usage (color-coded) ---
+# --- Model indicators: 1M-context badge · effort · thinking · fast ---
+# Window badge marks an above-default context window (e.g. 1M); hidden on the 200k default.
+WIN_BADGE=""
+[ "${CTX_SIZE:-0}" -gt 200000 ] && WIN_BADGE=" ${SAPPHIRE}$(fmt_tok "$CTX_SIZE")${RESET}"
+IND=""
+[ -n "$EFFORT" ] && IND=" ${OVERLAY}${EFFORT}${RESET}"
+[ "$THINKING" = "true" ] && IND="${IND} ${MAUVE}✻${RESET}"
+[ "$FAST" = "true" ] && IND="${IND} ${YELLOW}⚡${RESET}"
+MODEL_SEG="${MODEL_NAME}${WIN_BADGE}${IND}"
+
+# --- Context usage (color-coded); window size is shown as the model 1M badge ---
 CTX_INT=${CTX_USED%.*}
-if [ "${CTX_INT:-0}" -ge 90 ] 2>/dev/null; then CTX_COLOR="$RED"
-elif [ "${CTX_INT:-0}" -ge 70 ] 2>/dev/null; then CTX_COLOR="$YELLOW"
-else CTX_COLOR="$GREEN"; fi
+CTX_COLOR=$(pct_color "${CTX_INT:-0}")
+CTX_SEG="ctx ${CTX_COLOR}${CTX_USED}%${RESET}"
 
 # --- Last user prompt (from transcript, tail for performance) ---
 LAST_PROMPT=""
@@ -156,23 +222,48 @@ if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
     ' 2>/dev/null | grep -v '^$' | tail -1)
 fi
 
-# === Line 1: model, ctx, git/PR, path (65% width-aware) ===
+# === Line 1: Claude metadata — model/effort, ctx, rate limits, version ===
+# Values hug their labels (tight); only the ⟳ countdown is back-padded so the
+# 7d column doesn't jitter every minute as it ticks down.
+L1_SEGS=("$CTX_SEG")
+# Rate limits show REMAINING (100 − used); color stays keyed to used so low-remaining = red.
+RL5_INT=${RL5_PCT%.*}
+if [ "${RL5_INT:--1}" -ge 0 ]; then
+    _r5=$(fmt_until "$RL5_RESET")
+    L1_SEGS+=("5h $(pct_color "$RL5_INT")$(( 100 - RL5_INT ))%${RESET} ${OVERLAY}⟳ ${_r5}${RESET}$(sp $((5 - ${#_r5})))")
+fi
+RL7_INT=${RL7_PCT%.*}
+if [ "${RL7_INT:--1}" -ge 0 ]; then
+    L1_SEGS+=("7d $(pct_color "$RL7_INT")$(( 100 - RL7_INT ))%${RESET}")
+fi
+[ -n "$VERSION" ] && L1_SEGS+=("${OVERLAY}v${VERSION}${RESET}")
+
+L1="$MODEL_SEG"
+for s in "${L1_SEGS[@]}"; do L1="${L1} ${SEP} ${s}"; done
+printf '%b\n' "$L1"
+
+# === Line 2: repository — branch/status/PR, path (churn lives on L3, it's per-session) ===
 GIT_FORMATTED="${GREEN}${BRANCH}${RESET}${GIT_STATUS}${PR_DISPLAY}"
-GIT_PLAIN="${BRANCH}${STATUS_STR}${PR_NUM:+ #$PR_NUM}"
-
-L1_CORE="${MODEL_NAME} | ctx ${CTX_USED}%${GIT_PLAIN:+ | $GIT_PLAIN}"
-L1_WITH_DIR="${L1_CORE} | X in ${DIR}"
-
-if [ "${#L1_WITH_DIR}" -le "$MAX_WIDTH" ]; then
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET}${GIT_PLAIN:+ ${SEP} ${GIT_FORMATTED}} ${SEP} ${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${STYLE_INDICATOR}"
+DIR_SEG="${LAVENDER}${OS_ICON}${RESET} in ${SAPPHIRE}${DIR}${RESET}${STYLE_INDICATOR}"
+if [ -n "$BRANCH" ]; then
+    printf '%b\n' "${GIT_FORMATTED} ${SEP} ${DIR_SEG}"
 else
-    printf '%b\n' "${MODEL_NAME} ${SEP} ctx ${CTX_COLOR}${CTX_USED}%${RESET}${GIT_PLAIN:+ ${SEP} ${GIT_FORMATTED}}"
+    printf '%b\n' "$DIR_SEG"
 fi
 
-# === Line 2: session ID ===
-printf '%b\n' "${OVERLAY}${SESSION_ID}${RESET}"
+# === Line 3: session — name, uptime, churn (this session's own edits) ===
+# Falls back to the full UUID when unnamed — the only resume token in that case.
+SESS="${OVERLAY}↑ $(fmt_dur "$DUR_MS")${RESET}"
+if [ "${LINES_ADD:-0}" -gt 0 ] || [ "${LINES_DEL:-0}" -gt 0 ]; then
+    SESS="${SESS} ${SEP} ${GREEN}+${LINES_ADD}${RESET}/${RED}-${LINES_DEL}${RESET}"
+fi
+if [ -n "$SESSION_NAME" ]; then
+    printf '%b\n' "${LAVENDER}✎ $(truncate "$SESSION_NAME" "$((MAX_WIDTH - 22))")${RESET} ${SEP} ${SESS}"
+else
+    printf '%b\n' "${OVERLAY}${SESSION_ID}${RESET} ${SEP} ${SESS}"
+fi
 
-# === Line 3: last prompt (width-aware) ===
+# === Line 4: last prompt (width-aware) ===
 if [ -n "$LAST_PROMPT" ]; then
     LAST_PROMPT=$(truncate "$LAST_PROMPT" "$((MAX_WIDTH - 10))")
     printf '%b\n' "${MAUVE}${LAST_PROMPT}${RESET}"
