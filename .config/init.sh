@@ -23,7 +23,7 @@ mkdir -p "$CONFIG_DIR"
 
 # ---- Directory symlinks (Stow-style) ----
 # -n flag: treat existing symlink-to-dir as file to replace (idempotent)
-DIRS=(wezterm nvim fish neofetch)
+DIRS=(wezterm nvim fish neofetch ghostty)
 
 for dir in "${DIRS[@]}"; do
   if [[ -d "$SCRIPT_DIR/$dir" ]]; then

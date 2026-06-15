@@ -1,0 +1,92 @@
+# Ghostty configuration (macOS)
+# Managed by dotfiles — mirrors the WezTerm setup where Ghostty allows it.
+# Ghostty is declarative (no Lua), so the dynamic bits from wezterm.lua
+# (Catppuccin status bar, tab badges, OS detection, project picker) are NOT
+# portable and intentionally omitted.
+
+# ---- Appearance ----
+theme = GitHub Dark
+# Auto light/dark (replaces appearance.lua) — uncomment to enable:
+# theme = dark:GitHub Dark,light:GitHub Light Default
+# GitHub Dark's default fg is a muted gray (#8b949e); brighten it like WezTerm.
+foreground = e6edf3
+
+# Primary font for Latin/symbols; D2Coding fallback for Korean glyphs.
+font-family = JetBrainsMonoNL Nerd Font
+font-family = D2Coding
+font-size = 13
+
+background-opacity = 0.75
+background-blur = 30
+
+window-padding-x = 8
+window-padding-y = 8
+window-padding-balance = true
+
+macos-titlebar-style = transparent
+
+# Scroll sensitivity (default precision:1,discrete:3 — felt too sensitive vs WezTerm).
+# precision = trackpad/Magic Mouse, discrete = notched mouse wheel. Lower = slower.
+mouse-scroll-multiplier = precision:1,discrete:1
+
+# ---- Quality of life (community defaults) ----
+copy-on-select = clipboard
+mouse-hide-while-typing = false
+window-save-state = always
+# quit the app entirely when the last window closes
+quit-after-last-window-closed = true
+# Optional toggles (uncomment to taste):
+# confirm-close-surface = false    # close without prompt (kills running procs!)
+# macos-option-as-alt = true       # Alt-based tmux/vim binds; breaks Option special chars
+
+# ---- Shell integration ----
+# ssh-terminfo auto-installs Ghostty's terminfo on remote hosts over SSH,
+# fixing "missing or unsuitable terminal: xterm-ghostty" (e.g. ts-ddps).
+# ssh-env falls back to TERM=xterm-256color when terminfo can't be installed.
+shell-integration-features = cursor,title,path,ssh-env,ssh-terminfo
+
+# ============================================================
+# Keybindings  (Leader = Ctrl+A, mirrors WezTerm)
+# Ghostty leader-style sequences use `>` between the trigger and the next key.
+# ============================================================
+
+# Pass a literal Ctrl+A through to the shell/tmux (Ctrl+A, Ctrl+A)
+keybind = ctrl+a>ctrl+a=text:\x01
+
+# Pane splits  ( " = left/right,  % = top/bottom — same as WezTerm )
+keybind = ctrl+a>"=new_split:right
+keybind = ctrl+a>%=new_split:down
+
+# Pane navigation (h/j/k/l + arrows)
+keybind = ctrl+a>h=goto_split:left
+keybind = ctrl+a>j=goto_split:bottom
+keybind = ctrl+a>k=goto_split:top
+keybind = ctrl+a>l=goto_split:right
+keybind = ctrl+a>left=goto_split:left
+keybind = ctrl+a>down=goto_split:bottom
+keybind = ctrl+a>up=goto_split:top
+keybind = ctrl+a>right=goto_split:right
+
+# Pane resize — WezTerm used a modal "resize" key table (not supported in
+# Ghostty); replaced with direct Leader+Shift+hjkl binds.
+keybind = ctrl+a>shift+h=resize_split:left,10
+keybind = ctrl+a>shift+j=resize_split:down,10
+keybind = ctrl+a>shift+k=resize_split:up,10
+keybind = ctrl+a>shift+l=resize_split:right,10
+
+# ---- Readline-style word/line navigation (macOS) ----
+# Option+Left/Right = jump word (Alt+b / Alt+f)
+keybind = opt+left=text:\x1bb
+keybind = opt+right=text:\x1bf
+# Cmd+Left/Right = start/end of line (Ctrl+A / Ctrl+E)
+keybind = cmd+left=text:\x01
+keybind = cmd+right=text:\x05
+# Cmd+Backspace = delete to line start (Ctrl+U)
+keybind = cmd+backspace=text:\x15
+
+# ---- Tab navigation ----
+keybind = cmd+alt+left=previous_tab
+keybind = cmd+alt+right=next_tab
+
+# Shift+Enter = send ESC + CR (matches WezTerm)
+keybind = shift+enter=text:\x1b\r
