@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+INSTANCE_ID="${LLM_WIKI_INSTANCE_ID:-$(hostname -s | tr '[:upper:]' '[:lower:]')}"
+
+if [[ $# -lt 1 ]]; then
+  echo "usage: llm-wiki-commit <summary> [git commit args...]" >&2
+  echo 'example: llm-wiki-commit "record orbit architecture notes"' >&2
+  exit 64
+fi
+
+summary="$1"
+shift
+
+if [[ "$summary" == *": "* ]]; then
+  message="$summary"
+else
+  message="$INSTANCE_ID: $summary"
+fi
+
+exec llm-wiki-git commit -m "$message" "$@"

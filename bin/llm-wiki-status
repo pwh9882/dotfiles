@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec llm-wiki-git status --short --branch "$@"

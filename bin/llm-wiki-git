@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+resolve_wiki_dir() {
+  if [[ -n "${LLM_WIKI_DIR:-}" ]]; then
+    printf '%s\n' "$LLM_WIKI_DIR"
+    return 0
+  fi
+
+  local candidates=(
+    "$HOME/Documents/Obsidian Vault/LLM-WIKI"
+    "$HOME/llm-wiki"
+    "$HOME/obsidian-vault/LLM-WIKI"
+  )
+
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [[ -e "$candidate/.git" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+WIKI_DIR="$(resolve_wiki_dir || true)"
+
+if [[ -z "$WIKI_DIR" || ! -d "$WIKI_DIR" ]]; then
+  echo "llm-wiki-git: LLM-WIKI directory not found" >&2
+  echo "Set LLM_WIKI_DIR to the wiki checkout path." >&2
+  exit 2
+fi
+
+if [[ ! -e "$WIKI_DIR/.git" ]]; then
+  echo "llm-wiki-git: .git is not visible at: $WIKI_DIR" >&2
+  echo "Checked: ~/Documents/Obsidian Vault/LLM-WIKI, ~/llm-wiki, ~/obsidian-vault/LLM-WIKI" >&2
+  echo "Set LLM_WIKI_DIR to a visible Git checkout, or open LLM-WIKI as the Codex workspace." >&2
+  exit 2
+fi
+
+if [[ $# -eq 0 ]]; then
+  set -- status --short --branch
+fi
+
+cmd="$1"
+case "$cmd" in
+  status|diff|log|show|remote|branch|rev-parse|ls-files|ls-remote|fetch|pull|push|add|commit)
+    ;;
+  *)
+    echo "llm-wiki-git: git subcommand '$cmd' is not allowed by this wrapper" >&2
+    echo "Allowed: status diff log show remote branch rev-parse ls-files ls-remote fetch pull push add commit" >&2
+    exit 64
+    ;;
+esac
+
+exec git -C "$WIKI_DIR" "$@"
