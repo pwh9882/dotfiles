@@ -6,6 +6,7 @@ AI 코딩 에이전트를 위한 상세 기술 레퍼런스.
 
 ```
 dotfiles/
+├── bin/                       # 사용자 실행 스크립트 + ~/.local/bin 링크
 ├── init.sh                    # 전체 초기화 오케스트레이터
 ├── zsh/                       # Zsh 셸 설정
 │   ├── .zshrc                 # 공통 설정 (모든 기기 공유)
@@ -101,3 +102,10 @@ bash tmux/init.sh  # tmux만 설치 (brew/apt/pacman 지원)
 - API 키, 토큰, 비밀번호가 포함된 파일
 - 에디터 AI 대화 기록
 - 임시 파일, 런타임 생성 파일 (embeddings, AppSupport 등)
+
+## LLM-WIKI Git Wrappers
+
+- 원본은 `bin/llm-wiki-git`, `bin/llm-wiki-status`, `bin/llm-wiki-commit`에 둔다.
+- `bin/init.sh`가 세 명령을 `~/.local/bin/`으로 심볼릭 링크한다.
+- wrapper는 `LLM_WIKI_DIR`이 있으면 그 값을 우선하고, 없으면 `~/llm-wiki`, `~/obsidian-vault/LLM-WIKI`, `~/Documents/Obsidian Vault/LLM-WIKI` 순서로 Git checkout을 찾는다.
+- 프로젝트 Codex 세션에서 wiki Git을 다룰 때는 raw `git -C` 대신 이 wrapper를 사용한다.

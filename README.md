@@ -15,6 +15,7 @@
 - **[Zed](/.config/zed/)** - 모던 에디터 (SSH 원격 개발 지원)
 
 ### 🛠️ 시스템 도구
+- **[bin](/bin/)** - 사용자 스크립트 (`llm-wiki-git`, `llm-wiki-status`, `llm-wiki-commit`)
 - **[Karabiner](/.config/karabiner/)** - 키보드 리매핑
 - **[Git](/git/)** - Git 전역 설정
 - **[Neofetch](/.config/neofetch/)** - 시스템 정보 표시
