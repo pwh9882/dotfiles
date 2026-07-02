@@ -34,6 +34,17 @@ alias cld="claude"
 alias bwu='export BW_SESSION=$(bw unlock --raw)'
 alias j="z"
 
+ssht() {
+    if (( $# == 0 )); then
+        print -u2 "usage: ssht [ssh-options] <host>"
+        return 2
+    fi
+
+    local remote_command=$'exec "${SHELL:-/bin/sh}" -lic \'if command -v tmux >/dev/null 2>&1; then tmux attach || tmux new; else echo "ssht: tmux not found on remote host" >&2; exit 127; fi\''
+    command ssh -t "$@" "$remote_command"
+}
+compdef _ssh ssht 2>/dev/null
+
 # ---- Common PATH ----
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$HOME/.local/bin:$PATH"
