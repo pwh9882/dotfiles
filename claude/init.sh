@@ -30,13 +30,8 @@ mkdir -p "$CLAUDE_DIR"
 ln -sf "$SCRIPT_DIR/statusline-command.sh" "$CLAUDE_DIR/statusline-command.sh"
 echo "✅ Symlinked statusline-command.sh"
 
-# Symlink global agent memory (LLM-WIKI pointer) for Claude Code and Codex
-ln -sf "$SCRIPT_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
-echo "✅ Symlinked global CLAUDE.md (LLM-WIKI pointer)"
-
-mkdir -p "$HOME/.codex"
-ln -sf "$SCRIPT_DIR/CLAUDE.md" "$HOME/.codex/AGENTS.md"
-echo "✅ Symlinked ~/.codex/AGENTS.md (LLM-WIKI pointer)"
+# Global agents file (LLM-WIKI pointer) for all harnesses — see agents/init.sh
+"$SCRIPT_DIR/../agents/init.sh"
 
 # Ensure statusline config in settings.json
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
