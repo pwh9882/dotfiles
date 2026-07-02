@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+# llm-wiki-lint — mechanical consistency checks for the LLM-WIKI bundle.
+#
+# FAIL (exit 1): frontmatter violations, git-tracked binaries/raw dumps,
+#                index coverage gaps.
+# warn (exit 0): broken relative links, .md filenames with spaces,
+#                commit prefixes not matching a documented instance_id,
+#                stale next.md / state snapshot.
+#
+# Runbook: LLM-WIKI/runbooks/wiki-lint.md
+set -uo pipefail
+
+resolve_wiki_dir() {
+  if [[ -n "${LLM_WIKI_DIR:-}" ]]; then
+    printf '%s\n' "$LLM_WIKI_DIR"
+    return 0
+  fi
+  local candidates=(
+    "$HOME/Documents/Obsidian Vault/LLM-WIKI"
+    "$HOME/llm-wiki"
+    "$HOME/obsidian-vault/LLM-WIKI"
+  )
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [[ -e "$candidate/.git" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+WIKI_DIR="$(resolve_wiki_dir || true)"
+if [[ -z "$WIKI_DIR" || ! -d "$WIKI_DIR" ]]; then
+  echo "llm-wiki-lint: LLM-WIKI directory not found (set LLM_WIKI_DIR)" >&2
+  exit 2
+fi
+cd "$WIKI_DIR"
+
+FAILS=0
+WARNS=0
+emit() { # emit <fail|warn> <message-lines-variable-content>
+  local level="$1" lines="$2" line
+  [[ -z "$lines" ]] && return 0
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    if [[ "$level" == fail ]]; then
+      echo "FAIL: $line"; FAILS=$((FAILS + 1))
+    else
+      echo "warn: $line"; WARNS=$((WARNS + 1))
+    fi
+  done <<< "$lines"
+}
+
+reserved_basename() {
+  case "$1" in
+    index.md|log.md|AGENTS.md|CLAUDE.md|README.md) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+echo "== llm-wiki-lint: $WIKI_DIR"
+
+# 1. Frontmatter: every tracked non-reserved .md needs '---' + non-empty type:
+FRONTMATTER=$(git -c core.quotepath=off ls-files '*.md' | while IFS= read -r f; do
+  reserved_basename "$(basename "$f")" && continue
+  if [[ "$(head -1 "$f")" != "---" ]]; then
+    echo "frontmatter missing: $f"
+    continue
+  fi
+  awk 'NR==1{next} /^---[[:space:]]*$/{exit 1} /^type:[[:space:]]*[^[:space:]]/{found=1; exit 0} END{exit found?0:1}' "$f" \
+    || echo "frontmatter has no type: $f"
+done)
+emit fail "$FRONTMATTER"
+
+# 2. Git-tracked binaries / raw-dump directories
+BINARIES=$( { git -c core.quotepath=off ls-files | grep -Ei '\.(pdf|hwp|hwpx|doc|docx|ppt|pptx|xls|xlsx|zip)$' || true; } \
+  | sed 's/^/binary tracked by git (belongs in vault sources\/): /')
+emit fail "$BINARIES"
+DUMPS=$( { git -c core.quotepath=off ls-files | grep -E '(^|/)(PDFs|extracted)/|/papers/pdf/' || true; } \
+  | sed 's/^/raw-dump path tracked by git: /')
+emit fail "$DUMPS"
+
+# 3. Index coverage: in each directory that has an index.md, every non-reserved
+#    tracked sibling .md and every child directory must be mentioned by name.
+COVERAGE=$(git -c core.quotepath=off ls-files '*index.md' | sed 's|/index.md$||; s|^index.md$|.|' | sort -u | while IFS= read -r dir; do
+  idx="$dir/index.md"
+  [[ -f "$idx" ]] || continue
+  git -c core.quotepath=off ls-files "$dir/*.md" | while IFS= read -r f; do
+    [[ "$(dirname "$f")" == "$dir" ]] || continue
+    base=$(basename "$f")
+    reserved_basename "$base" && continue
+    grep -qF "${base%.md}" "$idx" || echo "not in $idx: $base"
+  done
+  git -c core.quotepath=off ls-files "$dir/*" | while IFS= read -r f; do
+    rel="${f#"$dir"/}"
+    child="${rel%%/*}"
+    [[ "$rel" == "$child" ]] && continue
+    [[ "$child" == _* || "$child" == .* ]] && continue
+    echo "$child"
+  done | sort -u | while IFS= read -r child; do
+    grep -qF "$child" "$idx" || echo "not in $idx: $child/"
+  done
+done)
+emit fail "$COVERAGE"
+
+# 4. Broken relative markdown links (warn — OKF tolerates, but list them)
+LINKS=$(git -c core.quotepath=off ls-files '*.md' | while IFS= read -r f; do
+  grep -oE '\]\(([^)#][^)]*)\)' "$f" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//' | while IFS= read -r target; do
+    [[ "$target" == http://* || "$target" == https://* || "$target" == mailto:* || "$target" == ssh://* || "$target" == file://* ]] && continue
+    target="${target%%#*}"
+    [[ -z "$target" ]] && continue
+    # citation-style prose like "[29](설명)" is not a link: skip targets with
+    # literal spaces or without any path character (/ or .); real links to
+    # spaced filenames use %20 (decoded below)
+    [[ "$target" == *" "* ]] && continue
+    [[ "$target" != */* && "$target" != *.* ]] && continue
+    target="${target//%20/ }"
+    if [[ "$target" == /* ]]; then
+      resolved=".${target}"
+    else
+      resolved="$(dirname "$f")/${target}"
+    fi
+    [[ -e "$resolved" ]] || echo "broken link in $f -> $target"
+  done
+done | sort -u)
+emit warn "$LINKS"
+
+# 5. Concept .md filenames with spaces (kebab-case convention)
+SPACES=$( { git -c core.quotepath=off ls-files '*.md' | grep ' ' || true; } | sed 's/^/filename has spaces (kebab-case preferred): /')
+emit warn "$SPACES"
+
+# 6. Recent commit subjects should start with a documented instance_id
+IDS=$(grep -h '^instance_id:' instances/*.md 2>/dev/null | sed 's/^instance_id:[[:space:]]*//' | tr '\n' '|' | sed 's/|$//')
+if [[ -n "$IDS" ]]; then
+  PREFIXES=$(git log -15 --no-merges --format='%s' | while IFS= read -r subj; do
+    echo "$subj" | grep -qE "^(${IDS}): " || echo "commit prefix is not a documented instance_id: '$subj'"
+  done)
+  emit warn "$PREFIXES"
+fi
+
+# 7. Staleness hints (45 days since last commit touching the file)
+NOW=$(date +%s)
+STALE=$(for p in projects/llm-wiki-bootstrap/next.md state/current.md; do
+  [[ -f "$p" ]] || continue
+  last=$(git log -1 --format=%ct -- "$p" 2>/dev/null)
+  [[ -z "$last" ]] && continue
+  age_days=$(( (NOW - last) / 86400 ))
+  [[ "$age_days" -gt 45 ]] && echo "stale (${age_days}d since last commit): $p"
+done)
+emit warn "$STALE"
+
+echo "== result: ${FAILS} fail, ${WARNS} warn"
+[[ "$FAILS" -eq 0 ]] || exit 1
+exit 0
