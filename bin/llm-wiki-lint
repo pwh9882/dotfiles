@@ -139,6 +139,18 @@ if [[ -n "$IDS" ]]; then
   emit warn "$PREFIXES"
 fi
 
+# 7b. Lifecycle review triggers (OKF-X dogfood): a doc declaring
+#     lifecycle.review_when.age_days warns once untouched past that window
+REVIEW=$(git -c core.quotepath=off ls-files '*.md' | while IFS= read -r f; do
+  days=$(awk 'BEGIN{fm=0} /^---[[:space:]]*$/{fm++; next} fm==1 && /age_days:/ {gsub(/[^0-9]/,""); print; exit} fm>=2{exit}' "$f")
+  [[ -z "$days" ]] && continue
+  last=$(git log -1 --format=%ct -- "$f" 2>/dev/null)
+  [[ -z "$last" ]] && continue
+  age=$(( ($(date +%s) - last) / 86400 ))
+  [[ "$age" -gt "$days" ]] && echo "lifecycle review due (${age}d since last touch, threshold ${days}d): $f"
+done)
+emit warn "$REVIEW"
+
 # 7. Staleness hints (45 days since last commit touching the file)
 NOW=$(date +%s)
 STALE=$(for p in projects/llm-wiki-bootstrap/next.md state/current.md; do
