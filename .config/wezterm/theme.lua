@@ -37,6 +37,28 @@ function M.apply(config, is_macos)
     }
 
     local accents = { c.sapphire, c.green, c.lavender, c.peach, c.flamingo, c.yellow }
+    local host_color_map = {
+        ['ddps'] = c.sapphire,
+        ['ddps0'] = c.green,
+        ['ddps-srv-1'] = c.sapphire,
+        ['ddps-srv-2'] = c.green,
+        ['wini'] = c.lavender,
+        ['mini-ts'] = c.peach,
+        ['uci-gpu'] = c.flamingo,
+        ['norm'] = c.yellow,
+        ['woopc'] = c.green,
+    }
+    local host_os_map = {
+        ['ddps'] = 'linux',
+        ['ddps0'] = 'linux',
+        ['ddps-srv-1'] = 'linux',
+        ['ddps-srv-2'] = 'linux',
+        ['norm'] = 'linux',
+        ['uci-gpu'] = 'linux',
+        ['wini'] = 'darwin',
+        ['mini-ts'] = 'darwin',
+        ['woopc'] = 'linux',
+    }
     local local_host = wezterm.hostname():match('^([^%.]+)') or ''
     local pane_cwd_cache = {}
     local pane_host_cache = {}
@@ -50,13 +72,59 @@ function M.apply(config, is_macos)
         return logic.detect_remote(title, uv, local_host)
     end
 
+    local function host_color(host)
+        local key = logic.normalize_host(host)
+        return host_color_map[key] or accents[logic.hash_idx(host, #accents)]
+    end
+
+    local function host_os(host)
+        return host_os_map[logic.normalize_host(host)]
+    end
+
+    local function resolve_remote(title, uv, pid, domain_name)
+        local fresh_remote = detect_remote(title, uv)
+        if fresh_remote then
+            pane_host_cache[pid] = fresh_remote
+            return fresh_remote
+        end
+
+        local domain_remote = logic.detect_domain_remote(domain_name, local_host)
+        if domain_remote then
+            pane_host_cache[pid] = domain_remote
+            return domain_remote
+        end
+
+        local uv_host = uv and uv.WEZTERM_HOST or ''
+        if logic.is_same_host(uv_host, local_host) then
+            pane_host_cache[pid] = nil
+            pane_os_cache[pid] = nil
+            pane_cwd_cache[pid] = nil
+            return nil
+        end
+
+        return pane_host_cache[pid]
+    end
+
+    local function tab_title(tab)
+        local title = tab.tab_title
+        if title and #title > 0 then return title end
+        title = logic.strip_title(tab.active_pane.title or '')
+        if title and #title > 0 then return title end
+        return tab.active_pane.title or ''
+    end
+
     -- Tab title (Color Badge Style)
     wezterm.on('format-tab-title', function(tab, tabs, panes, cfg, hover, max_width)
-        local title = tab.active_pane.title or ''
-        local remote = detect_remote(title, tab.active_pane.user_vars or {})
-        local badge = remote and accents[logic.hash_idx(remote, #accents)] or c.mauve
+        local pane = tab.active_pane
+        local raw_title = pane.title or ''
+        local pid = tostring(pane.pane_id or tab.tab_id)
+        local remote = resolve_remote(raw_title, pane.user_vars or {}, pid, pane.domain_name)
+        local badge = remote and host_color(remote) or c.mauve
 
-        title = logic.strip_title(title)
+        local title = tab_title(tab)
+        if max_width and max_width > 4 then
+            title = wezterm.truncate_right(title, max_width - 4)
+        end
         local idx = tostring(tab.tab_index + 1)
 
         if tab.is_active then
@@ -89,30 +157,19 @@ function M.apply(config, is_macos)
         -- Host detection with cache:
         -- Once a remote host is detected, cache it. Only clear when
         -- positively identified as local (WEZTERM_HOST matches local).
-        local fresh_remote = detect_remote(title, uv)
-        local remote
-        if fresh_remote then
-            pane_host_cache[pid] = fresh_remote
-            remote = fresh_remote
-        else
-            local uv_host = uv.WEZTERM_HOST or ''
-            if uv_host == '' or uv_host == local_host then
-                -- Positively local: clear cache
-                pane_host_cache[pid] = nil
-                pane_os_cache[pid] = nil
-            end
-            remote = pane_host_cache[pid]
-        end
+        local remote = resolve_remote(title, uv, pid, pane:get_domain_name())
 
         -- OS detection with cache:
         -- Title-based Linux detection is definitive. Cache it so
         -- running programs (claude, vim) that change the title don't
         -- revert the icon to Apple.
         if remote then
-            local os_kind = logic.detect_os(remote, title, uv, is_macos)
+            local os_kind = host_os(remote) or logic.detect_os(remote, title, uv, is_macos)
             if logic.is_linux_title(title) then
                 pane_os_cache[pid] = 'linux'
-            elseif (uv.WEZTERM_HOST or '') == remote and (uv.WEZTERM_OS or '') ~= '' then
+            elseif host_os(remote) then
+                pane_os_cache[pid] = host_os(remote)
+            elseif logic.is_same_host(uv.WEZTERM_HOST, remote) and (uv.WEZTERM_OS or '') ~= '' then
                 pane_os_cache[pid] = os_kind
             end
             -- pane_os_cache[pid] keeps previous value if no strong signal
@@ -126,7 +183,7 @@ function M.apply(config, is_macos)
         elseif not remote then
             pane_cwd_cache[pid] = nil
         end
-        cwd = logic.shorten_path(cwd)
+        cwd = logic.shorten_path(cwd or workspace or remote or '')
 
         local right = {}
 
@@ -161,12 +218,12 @@ function M.apply(config, is_macos)
         -- Host + OS icon (use cached values)
         local display_host = remote or local_host
         local os_kind = pane_os_cache[pid]
+            or (remote and host_os(remote))
             or (remote and logic.detect_os(remote, title, uv, is_macos))
             or (is_macos and 'darwin' or 'linux')
         local os_icon = os_kind == 'darwin' and '\u{f0035}' or '\u{f17c}'
         if remote then
-            local host_color = accents[logic.hash_idx(remote, #accents)]
-            table.insert(right, { Background = { Color = host_color } })
+            table.insert(right, { Background = { Color = host_color(remote) } })
             table.insert(right, { Foreground = { Color = c.crust } })
         else
             table.insert(right, { Background = { Color = c.surface0 } })

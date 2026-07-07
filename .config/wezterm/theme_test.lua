@@ -32,6 +32,11 @@ test('shorten_path: single segment unchanged', function()
     eq(logic.shorten_path('home'), 'home')
 end)
 
+test('shorten_path: nil and empty are safe', function()
+    eq(logic.shorten_path(nil), '')
+    eq(logic.shorten_path(''), '')
+end)
+
 test('shorten_path: tilde prefix preserved', function()
     eq(logic.shorten_path('~/projects/myapp/src'), '~/p/m/src')
 end)
@@ -51,6 +56,30 @@ end)
 -- ========== detect_remote ==========
 
 local LOCAL = 'woohyeok-MacBookPro'
+
+-- ========== host normalization ==========
+
+test('normalize_host: lowercases and strips fqdn', function()
+    eq(logic.normalize_host('Wini.Local'), 'wini')
+    eq(logic.normalize_host(' ddps-srv-2.example.com '), 'ddps-srv-2')
+end)
+
+test('is_same_host: short and fqdn match', function()
+    assert(logic.is_same_host('wini', 'wini.local'))
+    assert(logic.is_same_host('WOOHYEOK-MACBOOKPRO.local', LOCAL))
+    assert(not logic.is_same_host('wini', 'woopc'))
+end)
+
+test('detect_domain_remote: local domain returns nil', function()
+    is_nil(logic.detect_domain_remote('local', LOCAL))
+    is_nil(logic.detect_domain_remote(LOCAL .. '.local', LOCAL))
+end)
+
+test('detect_domain_remote: ssh domains return host names', function()
+    eq(logic.detect_domain_remote('norm', LOCAL), 'norm')
+    eq(logic.detect_domain_remote('SSH:norm', LOCAL), 'norm')
+    eq(logic.detect_domain_remote('SSHMUX:ddps-srv-1', LOCAL), 'ddps-srv-1')
+end)
 
 test('detect_remote: local pane returns nil', function()
     is_nil(logic.detect_remote('~', {}, LOCAL))
@@ -78,10 +107,12 @@ end)
 
 test('detect_remote: local hostname in title returns nil', function()
     is_nil(logic.detect_remote('user@woohyeok-MacBookPro: ~', {}, LOCAL))
+    is_nil(logic.detect_remote('user@woohyeok-MacBookPro.local: ~', {}, LOCAL))
 end)
 
 test('detect_remote: local hostname in user_vars returns nil', function()
     is_nil(logic.detect_remote('~', { WEZTERM_HOST = LOCAL }, LOCAL))
+    is_nil(logic.detect_remote('~', { WEZTERM_HOST = LOCAL .. '.local' }, LOCAL))
 end)
 
 test('detect_remote: empty WEZTERM_HOST ignored', function()
@@ -246,8 +277,7 @@ test('resolve_cwd: remote ignores WEZTERM_CWD if host mismatch (stale)', functio
         'ddps-srv-2 ❐ main',  -- tmux, no path in title
         { WEZTERM_HOST = 'woohyeok-MacBookPro', WEZTERM_CWD = '~/dotfiles' },
         nil, 'ws')
-    -- No title path, host mismatch, no cache → falls through
-    eq(cwd, nil)  -- caller should use fallback
+    eq(cwd, 'ddps-srv-2')
 end)
 
 test('resolve_cwd: remote uses cache when title changes (tmux)', function()
@@ -283,8 +313,8 @@ test('detect_os: remote with Linux title format', function()
     eq(logic.detect_os('srv', 'user@srv: ~', {}, true), 'linux')
 end)
 
-test('detect_os: remote macOS via WEZTERM_OS', function()
-    eq(logic.detect_os('wini', '~', { WEZTERM_OS = 'Darwin' }, true), 'darwin')
+test('detect_os: remote ignores WEZTERM_OS without matching host', function()
+    eq(logic.detect_os('wini', '~', { WEZTERM_OS = 'Darwin' }, true), 'linux')
 end)
 
 test('detect_os: remote without WEZTERM_OS defaults to Linux', function()
@@ -293,6 +323,11 @@ end)
 
 test('detect_os: remote with stale Darwin but Linux title → Linux wins', function()
     eq(logic.detect_os('srv', 'user@srv: ~', { WEZTERM_OS = 'Darwin' }, true), 'linux')
+end)
+
+test('detect_os: matching WEZTERM_OS wins for remote host', function()
+    eq(logic.detect_os('mac-mini', 'user@mac-mini: ~',
+        { WEZTERM_HOST = 'mac-mini.local', WEZTERM_OS = 'Darwin' }, true), 'darwin')
 end)
 
 -- ========== Summary ==========

@@ -142,12 +142,13 @@ SSH 접속 시 탭 배지, 상태 바 CWD, 호스트명, OS 아이콘이 원격 
 │       • "host ❐ ..."        (Oh My Tmux)          │
 │       • "user@host[: ...]"  (Linux SSH)           │
 │    2) user_vars.WEZTERM_HOST (macOS SSH 등)       │
+│    3) pane별 캐시 (TUI가 title을 바꿀 때 유지)   │
 │                                                   │
 │  감지 결과 → 탭 배지 / 상태 바에 반영             │
 └───────────────────────────────────────────────────┘
 ```
 
-### 왜 2단계 감지인가
+### 왜 다단계 감지인가
 
 WezTerm은 일반 `ssh` 명령의 원격 호스트를 직접 알 수 없다:
 - `current_working_dir.host` — SSH 후에도 로컬 hostname 유지
@@ -164,16 +165,17 @@ user_vars는 중간 호스트(A)에 머물기 때문.
 | 로컬 | mauve (기본) | 활성: 색상 배경 + 어두운 글자 |
 | 원격 | 호스트별 accent | 비활성: 어두운 배경 + 색상 글자 |
 
-- 6색 팔레트: sapphire, green, lavender, peach, flamingo, yellow
-- 호스트명 해시 → 선호 색상 → 충돌 시 다음 색상으로 이동
+- 자주 쓰는 호스트는 고정 색상 map 사용
+- 그 외 호스트는 정규화된 hostname(short/lowercase) 기반 hash fallback
 
-### 상태 바 CWD (3단계 우선순위)
+### 상태 바 CWD (4단계 우선순위)
 
 ```
 원격 pane:
   1) pane title에서 path 추출  ← "user@host: /path" 형식 (가장 신뢰)
   2) WEZTERM_CWD               ← host 일치 시만 (macOS SSH + dotfiles)
-  3) pane별 캐시               ← tmux 진입 등으로 title이 바뀔 때
+  3) pane별 캐시               ← tmux/TUI 진입 등으로 title이 바뀔 때
+  4) 원격 hostname             ← 위 값이 모두 없을 때 안전 fallback
 
 로컬 pane:
   → WEZTERM_CWD (precmd가 매번 갱신)
@@ -190,7 +192,7 @@ title 추출을 최우선하는 이유: 원격 기기의 dotfiles가 오래되�
 | 상태 | 호스트명 | OS 아이콘 | 배경색 |
 |------|---------|-----------|--------|
 | 로컬 | 로컬 hostname | 로컬 OS 기반 | surface0 |
-| 원격 + dotfiles | 원격 hostname | WEZTERM_OS 기반 | accent (호스트별) |
+| 원격 + dotfiles | 원격 hostname | WEZTERM_HOST가 일치할 때 WEZTERM_OS 기반 | accent (호스트별) |
 | 원격 - dotfiles | 원격 hostname | Linux (기본) | accent (호스트별) |
 
 ### 셸 측 설정 (`zsh/.zshrc`)
@@ -200,11 +202,19 @@ title 추출을 최우선하는 이유: 원격 기기의 dotfiles가 오래되�
 # Re-emitting on precmd ensures values reset after exiting SSH
 _wezterm_host_b64="$(echo -n "$(hostname -s)" | base64)"
 _wezterm_os_b64="$(echo -n "$(uname -s)" | base64)"
+_wezterm_user_var() {
+    local osc
+    osc="$(printf '\033]1337;SetUserVar=%s=%s\007' "$1" "$2")"
+    if [[ -n "$TMUX" ]]; then
+        printf '\033Ptmux;\033%s\033\\' "$osc"   # tmux passthrough 래핑
+    else
+        printf '%s' "$osc"
+    fi
+}
 _wezterm_set_vars() {
-    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_HOST "$_wezterm_host_b64"
-    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_OS "$_wezterm_os_b64"
-    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_CWD \
-        "$(printf '%s' "${PWD/#$HOME/~}" | base64)"
+    _wezterm_user_var WEZTERM_HOST "$_wezterm_host_b64"
+    _wezterm_user_var WEZTERM_OS "$_wezterm_os_b64"
+    _wezterm_user_var WEZTERM_CWD "$(printf '%s' "${PWD/#$HOME/~}" | base64)"
 }
 precmd_functions+=(_wezterm_set_vars)
 ```
@@ -212,6 +222,30 @@ precmd_functions+=(_wezterm_set_vars)
 - **OSC 1337 SetUserVar**: WezTerm 전용 이스케이프 시퀀스. 다른 터미널에서는 무시됨
 - **precmd 훅**: SSH 종료 후 로컬 셸로 돌아올 때 즉시 로컬 값으로 복구
 - **base64 사전 계산**: HOST/OS는 셸 시작 시 1회, CWD만 매 프롬프트마다 계산
+- **tmux passthrough 래핑**: tmux는 모르는 OSC를 삼키므로, `$TMUX` 안에서는
+  `ESC Ptmux; …` DCS로 감싸서 방출한다. tmux 쪽에는 `allow-passthrough on`
+  (tmux ≥ 3.3, `tmux.conf.local`)이 필요. 이 둘이 갖춰지면 로컬 tmux는 물론,
+  ssh 너머 원격 tmux 안의 셸에서도 user vars가 WezTerm까지 도달한다
+
+### 원격 tmux 직접 attach (`ssht`)
+
+`ssh -t host tmux new -A`처럼 원격 tmux에 바로 붙는 경우, 원격 tmux가
+셸과 WezTerm 사이에 끼기 때문에 일반 SSH와 신호 경로가 다르다:
+
+- **원격에 dotfiles 있음**: passthrough 래핑된 user vars가 원격 tmux를 통과해
+  도달하고, Oh My Tmux의 title(`#h ❐ #S`)로도 감지된다
+- **원격이 stock tmux**: `set-titles off`가 기본이고 raw OSC는 버려지므로
+  원격 쪽 신호가 전혀 없다
+
+후자를 위해 `zsh/.zshrc`의 `ssht [ssh-options] <host>` 래퍼는 ssh 접속 **전에**
+target host(마지막 인자)를 로컬에서 `WEZTERM_HOST`로 방출한다 (OS/CWD는
+stale 값 오인 방지를 위해 비움). 원격 설정과 무관하게 배지가 즉시 원격으로
+바뀌고, 종료 시 precmd가 로컬 값으로 복구한다.
+
+한계: 로컬 tmux 안에서 `ssht`로 nested tmux를 만들면 원격 셸의 user vars는
+로컬 tmux 층에서 버려진다 (passthrough는 한 층만 벗겨짐). 이 경우에도
+`ssht` 래퍼의 사전 방출 덕분에 호스트 배지는 정상 표시되며, CWD만 원격
+hostname fallback으로 표시된다.
 
 ### 새 기기 추가 시
 
