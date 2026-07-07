@@ -34,17 +34,6 @@ alias cld="claude"
 alias bwu='export BW_SESSION=$(bw unlock --raw)'
 alias j="z"
 
-ssht() {
-    if (( $# == 0 )); then
-        print -u2 "usage: ssht [ssh-options] <host>"
-        return 2
-    fi
-
-    local remote_command=$'exec "${SHELL:-/bin/sh}" -lic \'if command -v tmux >/dev/null 2>&1; then tmux attach || tmux new; else echo "ssht: tmux not found on remote host" >&2; exit 127; fi\''
-    command ssh -t "$@" "$remote_command"
-}
-compdef _ssh ssht 2>/dev/null
-
 # ---- Common PATH ----
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$HOME/.local/bin:$PATH"
@@ -75,17 +64,51 @@ export NVM_DIR="$HOME/.nvm"
 # Re-emitting on precmd ensures values reset after exiting SSH
 _wezterm_host_b64="$(echo -n "$(hostname -s)" | base64)"
 _wezterm_os_b64="$(echo -n "$(uname -s)" | base64)"
+
+# OSC 1337 SetUserVar 방출. tmux는 모르는 OSC를 삼키므로 tmux 안에서는
+# DCS passthrough(ESC Ptmux; …)로 감싸야 바깥 터미널까지 도달한다
+# (tmux.conf.local의 allow-passthrough on과 세트. 원격 tmux에 직접 attach해도
+#  원격 셸의 user var가 ssh 너머 WezTerm까지 전달되게 하는 핵심)
+# BEL(\007) 종결이라 내용물의 ESC는 선두 1개뿐 → 그것만 이중화하면 된다
+_wezterm_user_var() {
+    local osc
+    osc="$(printf '\033]1337;SetUserVar=%s=%s\007' "$1" "$2")"
+    if [[ -n "$TMUX" ]]; then
+        printf '\033Ptmux;\033%s\033\\' "$osc"
+    else
+        printf '%s' "$osc"
+    fi
+}
+
 _wezterm_set_vars() {
     # SSH/tmux/TUI sessions can disconnect before disabling terminal mouse modes.
     # Reset them at the shell prompt so mouse movement/scroll does not leak as input.
     printf "\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?1015l"
-    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_HOST "$_wezterm_host_b64"
-    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_OS "$_wezterm_os_b64"
-    printf "\033]1337;SetUserVar=%s=%s\007" WEZTERM_CWD "$(printf '%s' "${PWD/#$HOME/~}" | base64)"
+    _wezterm_user_var WEZTERM_HOST "$_wezterm_host_b64"
+    _wezterm_user_var WEZTERM_OS "$_wezterm_os_b64"
+    _wezterm_user_var WEZTERM_CWD "$(printf '%s' "${PWD/#$HOME/~}" | base64)"
 }
 precmd_functions+=(_wezterm_set_vars)
 
 alias fixmouse='printf "\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?1015l"'
+
+# ssht [ssh-options] <host>: ssh 접속과 동시에 원격 tmux attach (없으면 생성)
+ssht() {
+    if (( $# == 0 )); then
+        print -u2 "usage: ssht [ssh-options] <host>"
+        return 2
+    fi
+    # WezTerm 상태바가 즉시 원격 host를 표시하도록 접속 전에 로컬에서 방출.
+    # 원격이 stock tmux(set-titles off)면 title/user var 어느 쪽 신호도 없다.
+    # stale한 로컬 OS/CWD가 원격 것으로 오인되지 않게 비우고, ssh 종료 후에는
+    # precmd가 로컬 값을 재방출하며 원상복구된다.
+    _wezterm_user_var WEZTERM_HOST "$(printf '%s' "${${@[-1]}##*@}" | base64)"
+    _wezterm_user_var WEZTERM_OS ""
+    _wezterm_user_var WEZTERM_CWD ""
+    local remote_command=$'exec "${SHELL:-/bin/sh}" -lic \'if command -v tmux >/dev/null 2>&1; then tmux attach || tmux new; else echo "ssht: tmux not found on remote host" >&2; exit 127; fi\''
+    command ssh -t "$@" "$remote_command"
+}
+compdef _ssh ssht 2>/dev/null
 
 # starship prompt
 command -v starship &>/dev/null && eval "$(starship init zsh)"
