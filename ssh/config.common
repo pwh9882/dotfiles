@@ -3,6 +3,13 @@ Host *
   ControlPath ~/.ssh/sockets/%r@%h-%p
   ControlPersist yes
 
+  # 연결 시도 타임아웃 (기본 ~75초 → 120초)
+  ConnectTimeout 120
+
+  # Keepalive: 60초마다 신호 전송, 5회 무응답 시 끊김 (최대 5분 유휴 허용)
+  ServerAliveInterval 60
+  ServerAliveCountMax 5
+
   # ForwardAgent: 로컬 Bitwarden SSH agent를 원격 서버로 포워딩
   # 접속하는 머신에 Bitwarden Desktop이 켜져있으면 자동으로 agent 전달
   # 신뢰하는 서버에만 사용할 것 (악의적 서버가 agent를 악용할 수 있음)
