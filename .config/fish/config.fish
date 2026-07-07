@@ -14,3 +14,7 @@ end
 # <<< conda initialize <<<
 
 string match -q "$TERM_PROGRAM" "kiro" and . (kiro --locate-shell-integration-path fish)
+
+
+# Added by Antigravity CLI installer
+set -gx PATH "/Users/woohyeok/.local/bin" $PATH

@@ -71,3 +71,7 @@ else
     # Native Linux: Bitwarden Desktop 앱의 SSH Agent 소켓
     export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"
 fi
+
+
+# Added by Antigravity CLI installer
+export PATH="/Users/woohyeok/.local/bin:$PATH"

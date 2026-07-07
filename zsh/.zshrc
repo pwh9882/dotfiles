@@ -205,3 +205,10 @@ if [[ -n "$BREW_PREFIX" && -f "$BREW_PREFIX/share/zsh-syntax-highlighting/zsh-sy
 elif [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
     source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
+
+
+# Added by Antigravity CLI installer
+export PATH="/Users/woohyeok/.local/bin:$PATH"
+
+# OpenClaw Completion
+[ -f "/Users/woohyeok/.openclaw/completions/openclaw.zsh" ] && source "/Users/woohyeok/.openclaw/completions/openclaw.zsh"
