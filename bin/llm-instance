@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+IDENTITY_FILE="${LLM_INSTANCE_FILE:-$HOME/.config/llm-wiki/instance-id}"
+
+resolve_wiki_dir() {
+  if [[ -n "${LLM_WIKI_DIR:-}" ]]; then
+    printf '%s\n' "$LLM_WIKI_DIR"
+    return 0
+  fi
+
+  local candidates=(
+    "$HOME/Documents/Obsidian Vault/LLM-WIKI"
+    "$HOME/llm-wiki"
+    "$HOME/obsidian-vault/LLM-WIKI"
+  )
+
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [[ -e "$candidate/.git" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+usage() {
+  cat <<'EOF'
+Usage: llm-instance [--id|--details]
+
+Reads the machine-local LLM-WIKI instance id, validates it against the
+matching instance document and hostname, then prints the id.
+EOF
+}
+
+mode="${1:---id}"
+case "$mode" in
+  --id|--details)
+    ;;
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    exit 64
+    ;;
+esac
+
+if [[ ! -f "$IDENTITY_FILE" ]]; then
+  echo "llm-instance: identity file not found: $IDENTITY_FILE" >&2
+  exit 2
+fi
+
+instance_id="$(cat "$IDENTITY_FILE")"
+if [[ ! "$instance_id" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "llm-instance: identity file must contain one lowercase instance id" >&2
+  exit 2
+fi
+
+wiki_dir="$(resolve_wiki_dir || true)"
+if [[ -z "$wiki_dir" ]]; then
+  echo "llm-instance: LLM-WIKI directory not found" >&2
+  exit 3
+fi
+
+instance_doc="$wiki_dir/instances/$instance_id.md"
+if [[ ! -f "$instance_doc" ]]; then
+  echo "llm-instance: instance document not found: $instance_doc" >&2
+  exit 3
+fi
+
+document_id="$(awk '$1 == "instance_id:" { print $2; exit }' "$instance_doc")"
+if [[ "$document_id" != "$instance_id" ]]; then
+  echo "llm-instance: instance document id mismatch: expected $instance_id, found ${document_id:-missing}" >&2
+  exit 4
+fi
+
+document_hostname="$(awk '$1 == "hostname:" { print $2; exit }' "$instance_doc")"
+actual_hostname="$(hostname -s 2>/dev/null || hostname)"
+normalized_document_hostname="$(printf '%s' "$document_hostname" | tr '[:upper:]' '[:lower:]')"
+normalized_actual_hostname="$(printf '%s' "$actual_hostname" | tr '[:upper:]' '[:lower:]')"
+
+if [[ -n "$normalized_document_hostname" && "$normalized_document_hostname" != "$normalized_actual_hostname" ]]; then
+  echo "llm-instance: hostname mismatch for $instance_id: expected $document_hostname, found $actual_hostname" >&2
+  exit 4
+fi
+
+if [[ "$mode" == "--details" ]]; then
+  printf 'instance_id=%s\nhostname=%s\ninstance_doc=%s\n' "$instance_id" "$actual_hostname" "$instance_doc"
+else
+  printf '%s\n' "$instance_id"
+fi

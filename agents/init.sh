@@ -7,6 +7,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SRC="$SCRIPT_DIR/AGENTS.md"
 
+# Install the shared helper commands, including llm-instance.
+"$SCRIPT_DIR/../bin/init.sh"
+
 # --- Claude Code -------------------------------------------------------------
 # Claude Code reads CLAUDE.md, not AGENTS.md; a symlink is the documented
 # interop pattern (https://code.claude.com/docs/en/memory).
@@ -23,8 +26,9 @@ echo "✅ ~/.codex/AGENTS.md -> agents/AGENTS.md"
 # --- Hermes ------------------------------------------------------------------
 # Hermes auto-injects cwd AGENTS.md but has no global AGENTS.md; the global
 # pointer rides ~/.hermes/SOUL.md (loaded fresh every message). Append once.
-if [ -f "$HOME/.hermes/SOUL.md" ] && ! grep -q "LLM-WIKI" "$HOME/.hermes/SOUL.md"; then
-  cat >> "$HOME/.hermes/SOUL.md" <<'EOF'
+if [ -f "$HOME/.hermes/SOUL.md" ]; then
+  if ! grep -q "LLM-WIKI" "$HOME/.hermes/SOUL.md"; then
+    cat >> "$HOME/.hermes/SOUL.md" <<'EOF'
 
 <!-- Operational context (not persona): LLM-WIKI pointer. Managed alongside
      dotfiles/agents/AGENTS.md; Hermes has no global AGENTS.md, so it rides here. -->
@@ -33,7 +37,17 @@ if [ -f "$HOME/.hermes/SOUL.md" ] && ! grep -q "LLM-WIKI" "$HOME/.hermes/SOUL.md
 
 A shared LLM wiki lives at `~/Documents/Obsidian Vault/LLM-WIKI` (symlink `~/llm-wiki`). Before machine, infra, or project work, read its `index.md` and `AGENTS.md`; machine paths live in `instances/`, procedures in `runbooks/`, project state in `projects/`, past decisions in `decisions/`. Update it when durable knowledge changes; commit with `llm-wiki-git` / `llm-wiki-commit`, message prefix = current instance id. Sibling vault layers: `sources/` (raw source files) and `human-inbox/` (human-owned working area — write only where asked).
 EOF
-  echo "✅ appended LLM-WIKI section to ~/.hermes/SOUL.md"
+    echo "✅ appended LLM-WIKI section to ~/.hermes/SOUL.md"
+  fi
+  if ! grep -q "llm-instance" "$HOME/.hermes/SOUL.md"; then
+    cat >> "$HOME/.hermes/SOUL.md" <<'EOF'
+
+## Machine identity
+
+Before machine-, infra-, or project-related work, run `llm-instance` once and treat its one-line result as authoritative. Never infer the current machine from paths, usernames, or prior context. If it fails, stop machine-specific changes and repair `~/.config/llm-wiki/instance-id`.
+EOF
+    echo "✅ appended machine identity section to ~/.hermes/SOUL.md"
+  fi
 fi
 
 # --- OpenClaw ----------------------------------------------------------------
@@ -41,8 +55,8 @@ fi
 # typically workspace-only, so the section states that and routes via exec/user.
 for ws in "$HOME/.openclaw"/workspace*; do
   [ -f "$ws/AGENTS.md" ] || continue
-  grep -q "LLM-WIKI" "$ws/AGENTS.md" && continue
-  cat >> "$ws/AGENTS.md" <<'EOF'
+  if ! grep -q "LLM-WIKI" "$ws/AGENTS.md"; then
+    cat >> "$ws/AGENTS.md" <<'EOF'
 
 ## LLM-WIKI — durable shared memory (machine-wide)
 
@@ -51,7 +65,17 @@ A shared LLM wiki lives outside this workspace at `~/Documents/Obsidian Vault/LL
 - Filesystem tools here are workspace-only, so you cannot open it directly; use approved `exec` access or ask the user to bring the relevant document into the workspace.
 - When you learn something durable that outlives this workspace (infra facts, cross-machine knowledge, decisions), surface it to the user so it gets promoted into the wiki rather than living only in workspace memory.
 EOF
-  echo "✅ appended LLM-WIKI section to $ws/AGENTS.md"
+    echo "✅ appended LLM-WIKI section to $ws/AGENTS.md"
+  fi
+  if ! grep -q "llm-instance" "$ws/AGENTS.md"; then
+    cat >> "$ws/AGENTS.md" <<'EOF'
+
+## Machine identity
+
+Before machine-, infra-, or project-related work, run `llm-instance` through approved exec once and treat its one-line result as authoritative. Never infer the current machine from paths, usernames, or prior context. If it fails, stop machine-specific changes and repair `~/.config/llm-wiki/instance-id`.
+EOF
+    echo "✅ appended machine identity section to $ws/AGENTS.md"
+  fi
 done
 
 echo "🎉 agents wiring complete"
