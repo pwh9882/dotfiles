@@ -55,19 +55,19 @@ end)
 
 -- ========== detect_remote ==========
 
-local LOCAL = 'woohyeok-MacBookPro'
+local LOCAL = 'local-laptop'
 
 -- ========== host normalization ==========
 
 test('normalize_host: lowercases and strips fqdn', function()
-    eq(logic.normalize_host('Wini.Local'), 'wini')
-    eq(logic.normalize_host(' ddps-srv-2.example.com '), 'ddps-srv-2')
+    eq(logic.normalize_host('MAC-NODE.example.com'), 'mac-node')
+    eq(logic.normalize_host(' linux-b.example.com '), 'linux-b')
 end)
 
 test('is_same_host: short and fqdn match', function()
-    assert(logic.is_same_host('wini', 'wini.local'))
-    assert(logic.is_same_host('WOOHYEOK-MACBOOKPRO.local', LOCAL))
-    assert(not logic.is_same_host('wini', 'woopc'))
+    assert(logic.is_same_host('mac-node', 'mac-node.example.com'))
+    assert(logic.is_same_host('LOCAL-LAPTOP.example.com', LOCAL))
+    assert(not logic.is_same_host('mac-node', 'wsl-node'))
 end)
 
 test('detect_domain_remote: local domain returns nil', function()
@@ -75,10 +75,22 @@ test('detect_domain_remote: local domain returns nil', function()
     is_nil(logic.detect_domain_remote(LOCAL .. '.local', LOCAL))
 end)
 
+test('domain_kind: distinguishes local, WSL, SSH, and SSHMUX', function()
+    eq(logic.domain_kind('local', LOCAL), 'local')
+    eq(logic.domain_kind('WSL:Ubuntu-24.04', LOCAL), 'wsl')
+    eq(logic.domain_kind('SSH:linux-a', LOCAL), 'ssh')
+    eq(logic.domain_kind('linux-a', LOCAL), 'ssh')
+    eq(logic.domain_kind('SSHMUX:linux-b', LOCAL), 'sshmux')
+end)
+
+test('detect_domain_remote: WSL domain is local execution', function()
+    is_nil(logic.detect_domain_remote('WSL:Ubuntu-24.04', LOCAL))
+end)
+
 test('detect_domain_remote: ssh domains return host names', function()
-    eq(logic.detect_domain_remote('norm', LOCAL), 'norm')
-    eq(logic.detect_domain_remote('SSH:norm', LOCAL), 'norm')
-    eq(logic.detect_domain_remote('SSHMUX:ddps-srv-1', LOCAL), 'ddps-srv-1')
+    eq(logic.detect_domain_remote('linux-a', LOCAL), 'linux-a')
+    eq(logic.detect_domain_remote('SSH:linux-a', LOCAL), 'linux-a')
+    eq(logic.detect_domain_remote('SSHMUX:linux-b', LOCAL), 'linux-b')
 end)
 
 test('detect_remote: local pane returns nil', function()
@@ -88,26 +100,26 @@ test('detect_remote: local pane returns nil', function()
 end)
 
 test('detect_remote: Linux SSH title (user@host: path)', function()
-    eq(logic.detect_remote('whpark@ddps-srv-2: ~', {}, LOCAL), 'ddps-srv-2')
+    eq(logic.detect_remote('user@linux-b: ~', {}, LOCAL), 'linux-b')
     eq(logic.detect_remote('user@my-server.local: /home/user', {}, LOCAL), 'my-server.local')
 end)
 
 test('detect_remote: Oh My Tmux title (host ❐ session)', function()
-    eq(logic.detect_remote('ddps-srv-2 ❐ main ● 1 vim', {}, LOCAL), 'ddps-srv-2')
+    eq(logic.detect_remote('linux-b ❐ main ● 1 vim', {}, LOCAL), 'linux-b')
 end)
 
 test('detect_remote: user_vars WEZTERM_HOST fallback', function()
-    eq(logic.detect_remote('~', { WEZTERM_HOST = 'wini' }, LOCAL), 'wini')
+    eq(logic.detect_remote('~', { WEZTERM_HOST = 'mac-node' }, LOCAL), 'mac-node')
 end)
 
 test('detect_remote: title has priority over user_vars (nested SSH)', function()
-    -- MacBook → wini → pi: title shows pi, user_vars stuck at wini
-    eq(logic.detect_remote('user@pi: ~', { WEZTERM_HOST = 'wini' }, LOCAL), 'pi')
+    -- laptop → mac-node → edge-node: title is final, user_vars are stale
+    eq(logic.detect_remote('user@edge-node: ~', { WEZTERM_HOST = 'mac-node' }, LOCAL), 'edge-node')
 end)
 
 test('detect_remote: local hostname in title returns nil', function()
-    is_nil(logic.detect_remote('user@woohyeok-MacBookPro: ~', {}, LOCAL))
-    is_nil(logic.detect_remote('user@woohyeok-MacBookPro.local: ~', {}, LOCAL))
+    is_nil(logic.detect_remote('user@local-laptop: ~', {}, LOCAL))
+    is_nil(logic.detect_remote('user@local-laptop.example.com: ~', {}, LOCAL))
 end)
 
 test('detect_remote: local hostname in user_vars returns nil', function()
@@ -122,7 +134,7 @@ end)
 -- ========== hash_idx ==========
 
 test('hash_idx: returns 1-based index within range', function()
-    for _, name in ipairs({'alpha', 'beta', 'gamma', 'ddps-srv-2', 'wini', 'pi'}) do
+    for _, name in ipairs({'alpha', 'beta', 'gamma', 'linux-b', 'mac-node', 'edge-node'}) do
         local idx = logic.hash_idx(name, 6)
         assert(idx >= 1 and idx <= 6,
             string.format('%s: idx %d out of range [1,6]', name, idx))
@@ -130,7 +142,7 @@ test('hash_idx: returns 1-based index within range', function()
 end)
 
 test('hash_idx: deterministic', function()
-    eq(logic.hash_idx('ddps-srv-2', 6), logic.hash_idx('ddps-srv-2', 6))
+    eq(logic.hash_idx('linux-b', 6), logic.hash_idx('linux-b', 6))
 end)
 
 test('hash_idx: different names can differ', function()
@@ -145,15 +157,15 @@ end)
 -- ========== strip_title ==========
 
 test('strip_title: Oh My Tmux format', function()
-    eq(logic.strip_title('ddps-srv-2 ❐ main ● 1 vim'), 'main ● 1 vim')
+    eq(logic.strip_title('linux-b ❐ main ● 1 vim'), 'main ● 1 vim')
 end)
 
 test('strip_title: SSH user@host: path', function()
-    eq(logic.strip_title('whpark@ddps-srv-2: ~/projects'), '~/projects')
+    eq(logic.strip_title('user@linux-b: ~/projects'), '~/projects')
 end)
 
 test('strip_title: SSH user@host without colon', function()
-    eq(logic.strip_title('woohyeok@wini'), '')
+    eq(logic.strip_title('user@mac-node'), '')
 end)
 
 test('strip_title: plain title unchanged', function()
@@ -168,31 +180,31 @@ end)
 -- ========== extract_cwd_from_title ==========
 
 test('extract_cwd: Linux SSH format', function()
-    eq(logic.extract_cwd_from_title('whpark@ddps-srv-2: ~'), '~')
+    eq(logic.extract_cwd_from_title('user@linux-b: ~'), '~')
     eq(logic.extract_cwd_from_title('user@host: /home/user/projects'), '/home/user/projects')
 end)
 
 test('extract_cwd: no colon returns nil', function()
-    is_nil(logic.extract_cwd_from_title('woohyeok@wini'))
+    is_nil(logic.extract_cwd_from_title('user@mac-node'))
     is_nil(logic.extract_cwd_from_title('~'))
     is_nil(logic.extract_cwd_from_title(''))
 end)
 
 test('extract_cwd: tmux format returns nil', function()
-    is_nil(logic.extract_cwd_from_title('ddps-srv-2 ❐ main ● 1 vim'))
+    is_nil(logic.extract_cwd_from_title('linux-b ❐ main ● 1 vim'))
 end)
 
 -- ========== is_linux_title ==========
 
 test('is_linux_title: user@host: is Linux', function()
-    assert(logic.is_linux_title('whpark@ddps-srv-2: ~'))
+    assert(logic.is_linux_title('user@linux-b: ~'))
     assert(logic.is_linux_title('user@server.example.com: /home'))
 end)
 
 test('is_linux_title: no colon is not Linux', function()
-    assert(not logic.is_linux_title('woohyeok@wini'))
+    assert(not logic.is_linux_title('user@mac-node'))
     assert(not logic.is_linux_title('~'))
-    assert(not logic.is_linux_title('ddps-srv-2 ❐ main'))
+    assert(not logic.is_linux_title('linux-b ❐ main'))
 end)
 
 -- ========== assign_host_colors ==========
@@ -255,45 +267,54 @@ end)
 
 test('resolve_cwd: remote extracts from title first', function()
     local cwd = logic.resolve_cwd(
-        'ddps-srv-2',
-        'whpark@ddps-srv-2: /home/whpark',
-        { WEZTERM_HOST = 'ddps-srv-2', WEZTERM_CWD = '~/stale' },
+        'linux-b',
+        'user@linux-b: /home/user',
+        { WEZTERM_HOST = 'linux-b', WEZTERM_CWD = '~/stale' },
         nil, 'ws')
-    eq(cwd, '/home/whpark')
+    eq(cwd, '/home/user')
 end)
 
 test('resolve_cwd: remote falls back to WEZTERM_CWD if host matches', function()
     local cwd = logic.resolve_cwd(
-        'wini',
+        'mac-node',
         '~',  -- macOS: no user@host in title
-        { WEZTERM_HOST = 'wini', WEZTERM_CWD = '~/code' },
+        { WEZTERM_HOST = 'mac-node', WEZTERM_CWD = '~/code' },
+        nil, 'ws')
+    eq(cwd, '~/code')
+end)
+
+test('resolve_cwd: remote accepts normalized FQDN and case host match', function()
+    local cwd = logic.resolve_cwd(
+        'mac-node',
+        '~',
+        { WEZTERM_HOST = 'MAC-NODE.example.com', WEZTERM_CWD = '~/code' },
         nil, 'ws')
     eq(cwd, '~/code')
 end)
 
 test('resolve_cwd: remote ignores WEZTERM_CWD if host mismatch (stale)', function()
     local cwd = logic.resolve_cwd(
-        'ddps-srv-2',
-        'ddps-srv-2 ❐ main',  -- tmux, no path in title
-        { WEZTERM_HOST = 'woohyeok-MacBookPro', WEZTERM_CWD = '~/dotfiles' },
+        'linux-b',
+        'linux-b ❐ main',  -- tmux, no path in title
+        { WEZTERM_HOST = 'local-laptop', WEZTERM_CWD = '~/dotfiles' },
         nil, 'ws')
-    eq(cwd, 'ddps-srv-2')
+    eq(cwd, 'linux-b')
 end)
 
 test('resolve_cwd: remote uses cache when title changes (tmux)', function()
     local cwd = logic.resolve_cwd(
-        'ddps-srv-2',
-        'ddps-srv-2 ❐ main ● 1 vim',  -- tmux title, no path
+        'linux-b',
+        'linux-b ❐ main ● 1 vim',  -- tmux title, no path
         {},
-        '/home/whpark',  -- cached from before tmux
+        '/home/user',  -- cached from before tmux
         'ws')
-    eq(cwd, '/home/whpark')
+    eq(cwd, '/home/user')
 end)
 
 test('resolve_cwd: remote caches extracted CWD', function()
     local cwd, cache = logic.resolve_cwd(
-        'ddps-srv-2',
-        'whpark@ddps-srv-2: /opt/app',
+        'linux-b',
+        'user@linux-b: /opt/app',
         {}, nil, 'ws')
     eq(cwd, '/opt/app')
     eq(cache, '/opt/app')
@@ -314,11 +335,11 @@ test('detect_os: remote with Linux title format', function()
 end)
 
 test('detect_os: remote ignores WEZTERM_OS without matching host', function()
-    eq(logic.detect_os('wini', '~', { WEZTERM_OS = 'Darwin' }, true), 'linux')
+    eq(logic.detect_os('mac-node', '~', { WEZTERM_OS = 'Darwin' }, true), 'linux')
 end)
 
 test('detect_os: remote without WEZTERM_OS defaults to Linux', function()
-    eq(logic.detect_os('wini', '~', {}, true), 'linux')
+    eq(logic.detect_os('mac-node', '~', {}, true), 'linux')
 end)
 
 test('detect_os: remote with stale Darwin but Linux title → Linux wins', function()

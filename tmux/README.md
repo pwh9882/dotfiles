@@ -8,7 +8,13 @@
 bash tmux/init.sh
 ```
 
-tmux 설치 + Oh My Tmux 클론 + 설정 심링크가 자동으로 진행됩니다.
+tmux 설치 + 최초 Oh My Tmux 클론 + 설정 심링크가 진행됩니다. 기존 일반 파일·디렉터리·다른 symlink는 덮어쓰지 않고 package 설치나 clone 전에 중단합니다.
+
+Oh My Tmux는 shell 시작이나 installer 재실행 시 자동 갱신하지 않습니다. 검토한 시점에 다음 명령으로 명시적으로 갱신합니다.
+
+```bash
+git -C "${XDG_DATA_HOME:-$HOME/.local/share}/tmux/oh-my-tmux" pull --ff-only
+```
 
 ## 키바인딩
 

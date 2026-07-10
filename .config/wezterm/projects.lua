@@ -1,4 +1,6 @@
 local wezterm = require 'wezterm'
+local machine = require 'machine_config'
+local projects_logic = require 'projects_logic'
 local module = {}
 
 local DEBUG = false
@@ -8,12 +10,16 @@ local project_cache_time = 0
 
 -- Simple persistent history (LRU) of recently used projects
 local config_dir = wezterm.config_dir or (wezterm.home_dir .. "/.config/wezterm")
-local history_path = config_dir .. "/project_history.txt"
+local history = projects_logic.history_paths(
+  wezterm.home_dir,
+  config_dir,
+  os.getenv('XDG_STATE_HOME')
+)
 
 local function read_lines(path)
   local lines = {}
   local f = io.open(path, 'r')
-  if not f then return lines end
+  if not f then return nil end
   for line in f:lines() do
     if line and #line > 0 then table.insert(lines, line) end
   end
@@ -21,14 +27,41 @@ local function read_lines(path)
   return lines
 end
 
+local function read_history()
+  local lines = read_lines(history.path)
+  if lines then return lines end
+  -- Keep the old checkout-local history readable until the next write. The
+  -- old file is deliberately left in place so migration is non-destructive.
+  return read_lines(history.legacy_path) or {}
+end
+
+local function ensure_history_dir()
+  local args
+  if tostring(wezterm.target_triple or ''):match('windows') then
+    args = {
+      'powershell.exe', '-NoProfile', '-NonInteractive', '-Command',
+      '[System.IO.Directory]::CreateDirectory($args[0]) | Out-Null', history.dir,
+    }
+  else
+    args = { 'mkdir', '-p', history.dir }
+  end
+  return wezterm.run_child_process(args)
+end
+
 local function write_lines(path, lines)
+  -- Creating state is deferred until the user actually records a project.
+  ensure_history_dir()
   local f = io.open(path, 'w')
-  if not f then return end
+  if not f then
+    wezterm.log_error('project-history: cannot write ' .. path)
+    return false
+  end
   for _, l in ipairs(lines) do
     f:write(l)
     f:write('\n')
   end
   f:close()
+  return true
 end
 
 local function url_decode(str)
@@ -38,23 +71,20 @@ local function url_decode(str)
   end))
 end
 
--- The directory that contains all your projects.
-local project_dir = wezterm.home_dir .. "/development"
-local project_dir_years = {
-    wezterm.home_dir .. "/development/2024",
-    wezterm.home_dir .. "/development/2025"
-  }
--- Additional common project directories
-local additional_dirs = {
-    wezterm.home_dir .. "/AndroidStudioProjects/Zon",
-    wezterm.home_dir .. "/dotfiles",
-    wezterm.home_dir .. "/Documents",
-    wezterm.home_dir .. "/Desktop",
-    wezterm.home_dir .. "/mcps",
-    wezterm.home_dir .. "/Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드라이브/GD2025-01/UCI",
-    wezterm.home_dir .. "/Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드라이브/GD2025-02/석사수업/ANLP",
-    wezterm.home_dir .. "/Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드라이브/GD2025-02/석사수업/DCD"
-  }
+local project_globs = {
+  wezterm.home_dir .. '/development/*',
+  wezterm.home_dir .. '/development/20*/*',
+}
+for _, pattern in ipairs(machine.project_globs or {}) do
+  table.insert(project_globs, pattern)
+end
+
+local project_paths = {
+  wezterm.home_dir .. '/dotfiles',
+}
+for _, path in ipairs(machine.project_paths or {}) do
+  table.insert(project_paths, path)
+end
 
 -- Function to parse SSH config and extract host names
 local function get_ssh_hosts()
@@ -84,29 +114,29 @@ local function project_dirs()
 
   -- Start with your home directory as a project, 'cause you might want
   -- to jump straight to it sometimes.
-  local projects = { wezterm.home_dir }
-
-  -- WezTerm comes with a glob function! Let's use it to get a lua table
-  -- containing all subdirectories of your project folder.
-  for _, dir in ipairs(wezterm.glob(project_dir .. '/*')) do
-    -- ... and add them to the projects table.
-    table.insert(projects, dir)
-  end
-
-  for _, project_dir_year in ipairs(project_dir_years) do
-    for _, dir in ipairs(wezterm.glob(project_dir_year .. '/*')) do
-      table.insert(projects, dir)
+  local projects = {}
+  local seen = {}
+  local function add_project(id)
+    if id and id ~= '' and not seen[id] then
+      seen[id] = true
+      table.insert(projects, id)
     end
   end
 
-  -- Add additional directories
-  for _, dir in ipairs(additional_dirs) do
-    table.insert(projects, dir)
+  add_project(wezterm.home_dir)
+  for _, pattern in ipairs(project_globs) do
+    for _, dir in ipairs(wezterm.glob(pattern)) do
+      add_project(dir)
+    end
+  end
+
+  for _, dir in ipairs(project_paths) do
+    add_project(dir)
   end
 
   -- Add SSH hosts with special prefix
   for _, host in ipairs(get_ssh_hosts()) do
-    table.insert(projects, "SSH:" .. host)
+    add_project('SSH:' .. host)
   end
 
   project_cache = projects
@@ -131,8 +161,8 @@ local function current_project_id(pane)
   end
   if uri:match('^file://') then
     -- Examples:
-    --  - file:///Users/foo/bar
-    --  - file://hostname/Users/foo/bar
+    --  - file:///home/user/project
+    --  - file://hostname/home/user/project
     local path = uri:gsub('^file://', '')
     -- Strip host if present (file://host/...) leaving absolute path
     if not path:match('^/') and path:match('^[^/]+/') then
@@ -160,7 +190,7 @@ end
 
 local function push_recent(id)
   if not id or #id == 0 then return end
-  local recents = read_lines(history_path)
+  local recents = read_history()
   -- dedupe
   local filtered = {}
   for _, v in ipairs(recents) do
@@ -170,7 +200,7 @@ local function push_recent(id)
   -- limit size
   local max = 50
   while #filtered > max do table.remove(filtered) end
-  write_lines(history_path, filtered)
+  write_lines(history.path, filtered)
 end
 
 local function make_label(id)
@@ -186,7 +216,7 @@ local function build_choices_excluding_current(current_id)
   local set = {}
   for _, d in ipairs(dirs) do set[d] = true end
 
-  local recents = read_lines(history_path)
+  local recents = read_history()
   local recent_ids = {}
   local rest_ids = {}
   local added = {}
@@ -241,7 +271,7 @@ function module.record_current_as_recent(pane)
     local uri = pane and pane:get_current_working_dir() or nil
     wezterm.log_info("recent-history: unresolved current project; uri=", tostring(uri))
   elseif DEBUG then
-    wezterm.log_info("recent-history: push ", prev, " -> ", history_path)
+    wezterm.log_info("recent-history: push ", prev, " -> ", history.path)
   end
   push_recent(prev)
 end
@@ -264,12 +294,12 @@ function module.choose_project()
         if id:match('^SSH:') then
           local host = id:gsub('^SSH:', '')
           win2:perform_action(wezterm.action.SwitchToWorkspace({
-            name = host,
+            name = projects_logic.workspace_name(id, wezterm.home_dir),
             spawn = { args = { 'ssh', host }, cwd = wezterm.home_dir },
           }), pane2)
         else
           win2:perform_action(wezterm.action.SwitchToWorkspace({
-            name = id:match('([^/]+)$'),
+            name = projects_logic.workspace_name(id, wezterm.home_dir),
             spawn = { cwd = id },
           }), pane2)
         end

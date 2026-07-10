@@ -1,20 +1,18 @@
+# Shared Fish configuration. Machine-specific runtime initialization belongs in
+# config.local.fish, which is intentionally ignored by Git.
 
-# >>> mamba initialize >>>
-# !! Contents within this block are managed by 'mamba init' !!
-set -gx MAMBA_EXE "/Users/woohyeok/.micromamba/bin/micromamba"
-set -gx MAMBA_ROOT_PREFIX "/Users/woohyeok/micromamba"
-$MAMBA_EXE shell hook --shell fish --prefix $MAMBA_ROOT_PREFIX | source
-# <<< mamba initialize <<<
+contains -- "$HOME/.local/bin" $PATH; or set -gx PATH "$HOME/.local/bin" $PATH
 
-# >>> conda initialize >>>
-# !! Contents within this block are managed by 'conda init' !!
-if test -f /Users/woohyeok/micromamba/bin/conda
-    eval /Users/woohyeok/micromamba/bin/conda "shell.fish" "hook" $argv | source
+set -l dotfiles_fish_local (status dirname)/config.local.fish
+test -f "$dotfiles_fish_local"; and source "$dotfiles_fish_local"
+
+command -q starship; and starship init fish | source
+
+if command -q zoxide
+    zoxide init fish | source
+    alias j z
 end
-# <<< conda initialize <<<
 
-string match -q "$TERM_PROGRAM" "kiro" and . (kiro --locate-shell-integration-path fish)
-
-
-# Added by Antigravity CLI installer
-set -gx PATH "/Users/woohyeok/.local/bin" $PATH
+if test "$TERM_PROGRAM" = "kiro"; and command -q kiro
+    source (kiro --locate-shell-integration-path fish)
+end

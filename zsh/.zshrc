@@ -32,7 +32,7 @@ alias ll="ls -alhF"
 alias tf="terraform"
 alias cld="claude"
 alias bwu='export BW_SESSION=$(bw unlock --raw)'
-alias j="z"
+alias j="cd"
 
 # ---- Common PATH ----
 export BUN_INSTALL="$HOME/.bun"
@@ -110,6 +110,108 @@ ssht() {
 }
 compdef _ssh ssht 2>/dev/null
 
+# cods <ssh-alias> [remote-path]
+# cods [remote-path]
+#   Uses DOTFILES_CODS_SSH_ALIAS when the first argument is an absolute path.
+#
+# Keep the alias (rather than a hostname) in ~/.zshenv.secrets. The URI is
+# passed as one argument, so paths containing spaces are preserved.
+cods() {
+    local ssh_alias remote_path
+
+    if (( $# > 2 )); then
+        print -u2 "usage: cods [ssh-alias] [remote-path]"
+        return 2
+    fi
+
+    ssh_alias="${DOTFILES_CODS_SSH_ALIAS:-}"
+    remote_path="${DOTFILES_CODS_REMOTE_PATH:-/}"
+    if (( $# == 1 )); then
+        if [[ "$1" == /* ]]; then
+            remote_path="$1"
+        else
+            ssh_alias="$1"
+        fi
+    elif (( $# == 2 )); then
+        ssh_alias="$1"
+        remote_path="$2"
+    fi
+
+    if [[ -z "$ssh_alias" ]]; then
+        print -u2 "cods: pass an SSH alias or set DOTFILES_CODS_SSH_ALIAS in ~/.zshenv.secrets"
+        return 2
+    fi
+
+    case "$ssh_alias" in
+        *[!A-Za-z0-9._-]*)
+            print -u2 "cods: SSH alias may contain only letters, digits, dot, underscore, and hyphen"
+            return 2
+            ;;
+    esac
+    if [[ "$remote_path" != /* ]]; then
+        print -u2 "cods: remote path must be absolute: $remote_path"
+        return 2
+    fi
+    if ! command -v code &>/dev/null; then
+        print -u2 "cods: VS Code CLI 'code' was not found"
+        return 127
+    fi
+
+    command code --folder-uri "vscode-remote://ssh-remote+${ssh_alias}${remote_path}"
+}
+
+# Open the only locally mounted Google Drive. A machine with multiple Drive
+# accounts can select one explicitly with DOTFILES_GOOGLE_DRIVE_DIR.
+gdrive() {
+    local drive_root account
+    local -a accounts
+
+    if (( $# != 0 )); then
+        print -u2 "usage: gd"
+        return 2
+    fi
+
+    if [[ -n "${DOTFILES_GOOGLE_DRIVE_DIR:-}" ]]; then
+        drive_root="$DOTFILES_GOOGLE_DRIVE_DIR"
+    else
+        accounts=("$HOME/Library/CloudStorage"/GoogleDrive-*(N/))
+        case ${#accounts[@]} in
+            0)
+                print -u2 "gd: no Google Drive mount found under ~/Library/CloudStorage"
+                return 1
+                ;;
+            1)
+                account="${accounts[1]%/}"
+                ;;
+            *)
+                print -u2 "gd: multiple Google Drive mounts found; set DOTFILES_GOOGLE_DRIVE_DIR"
+                return 1
+                ;;
+        esac
+
+        if [[ -d "$account/My Drive" ]]; then
+            drive_root="$account/My Drive"
+        elif [[ -d "$account/내 드라이브" ]]; then
+            drive_root="$account/내 드라이브"
+        else
+            drive_root="$account"
+        fi
+    fi
+
+    if [[ ! -d "$drive_root" ]]; then
+        print -u2 "gd: directory does not exist: $drive_root"
+        return 1
+    fi
+    builtin cd -- "$drive_root"
+}
+
+# Oh My Zsh's git plugin owns `gd` by default. macOS profiles have long used
+# that name for Google Drive; replace it only where the Drive mount exists.
+# Other platforms keep the plugin's `gd='git diff'` alias.
+if [[ "$OSTYPE" == darwin* ]]; then
+    alias gd='gdrive'
+fi
+
 # starship prompt
 command -v starship &>/dev/null && eval "$(starship init zsh)"
 
@@ -181,22 +283,43 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 fi
 
 # ---- SSH_AUTH_SOCK for Bitwarden SSH Agent ----
-if grep -qi microsoft /proc/version 2>/dev/null; then
-    # WSL2: Windows Bitwarden Desktop → npiperelay + socat bridge
-    export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
-    if ! ss -a 2>/dev/null | grep -q "$SSH_AUTH_SOCK"; then
-        rm -f "$SSH_AUTH_SOCK"
-        mkdir -p "$HOME/.ssh"
-        setsid socat \
-            UNIX-LISTEN:"$SSH_AUTH_SOCK",fork \
-            EXEC:"npiperelay.exe -ei -s //./pipe/openssh-ssh-agent",nofork &>/dev/null &
+# Preserve a valid forwarded or user-provided agent. Fall back to a local
+# Bitwarden socket only when the current socket is absent or stale.
+if [[ -z "${SSH_AUTH_SOCK:-}" || ! -S "$SSH_AUTH_SOCK" ]]; then
+    if grep -qi microsoft /proc/version 2>/dev/null; then
+        # WSL2: Windows Bitwarden Desktop → npiperelay + socat bridge
+        _dotfiles_agent_sock="$HOME/.ssh/agent.sock"
+        _dotfiles_agent_live=0
+        if [[ -S "$_dotfiles_agent_sock" ]]; then
+            if command -v ss &>/dev/null; then
+                ss -xl 2>/dev/null | grep -F -- "$_dotfiles_agent_sock" >/dev/null && _dotfiles_agent_live=1
+            else
+                _dotfiles_agent_live=1
+            fi
+        fi
+        if (( ! _dotfiles_agent_live )); then
+            rm -f "$_dotfiles_agent_sock"
+            mkdir -p "$HOME/.ssh"
+            setsid socat \
+                UNIX-LISTEN:"$_dotfiles_agent_sock",fork \
+                EXEC:"npiperelay.exe -ei -s //./pipe/openssh-ssh-agent",nofork &>/dev/null &
+        fi
+        export SSH_AUTH_SOCK="$_dotfiles_agent_sock"
+    else
+        for _dotfiles_agent_sock in \
+            "$HOME/.bitwarden-ssh-agent.sock" \
+            "$HOME/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock"
+        do
+            if [[ -S "$_dotfiles_agent_sock" ]]; then
+                export SSH_AUTH_SOCK="$_dotfiles_agent_sock"
+                break
+            fi
+        done
     fi
-else
-    # macOS / Native Linux: Bitwarden Desktop 앱의 SSH Agent 소켓
-    export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"
 fi
+unset _dotfiles_agent_sock _dotfiles_agent_live
 
-# zoxide
+# zoxide replaces cd with its smart jump; j is an alias for the same thing.
 command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)"
 
 # zsh-syntax-highlighting should be sourced last.
@@ -207,8 +330,5 @@ elif [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; th
 fi
 
 
-# Added by Antigravity CLI installer
-export PATH="/Users/woohyeok/.local/bin:$PATH"
-
 # OpenClaw Completion
-[ -f "/Users/woohyeok/.openclaw/completions/openclaw.zsh" ] && source "/Users/woohyeok/.openclaw/completions/openclaw.zsh"
+[ -f "$HOME/.openclaw/completions/openclaw.zsh" ] && source "$HOME/.openclaw/completions/openclaw.zsh"

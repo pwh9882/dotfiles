@@ -6,6 +6,17 @@ HOSTNAME="$(hostname -s)"
 LOCAL_FILE="$SCRIPT_DIR/.zshrc.local.$HOSTNAME"
 ZSHENV_LOCAL_FILE="$SCRIPT_DIR/.zshenv.local.$HOSTNAME"
 
+# shellcheck source=../lib/dotfiles/legacy_links.sh
+. "$SCRIPT_DIR/../lib/dotfiles/legacy_links.sh"
+
+# Validate every managed HOME link before package installation or file writes.
+# The legacy init is not transactional, so a conflict stops the whole link
+# phase before an earlier destination is changed.
+df_legacy_preflight_exact_link "$SCRIPT_DIR/.zshenv" "$HOME/.zshenv"
+df_legacy_preflight_exact_link "$ZSHENV_LOCAL_FILE" "$HOME/.zshenv.local"
+df_legacy_preflight_exact_link "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
+df_legacy_preflight_exact_link "$LOCAL_FILE" "$HOME/.zshrc.local"
+
 # ---- Helper: detect and activate Homebrew ----
 setup_brew() {
     command -v brew &>/dev/null && return 0
@@ -105,11 +116,7 @@ else
     fi
 fi
 
-# ---- Symlink shared .zshenv (loaded by every zsh invocation) ----
-ln -sf "$SCRIPT_DIR/.zshenv" "$HOME/.zshenv"
-echo "  Linked .zshenv"
-
-# ---- Symlink machine-specific zsh environment ----
+# ---- Create machine-specific source files when missing ----
 if [[ ! -f "$ZSHENV_LOCAL_FILE" ]]; then
     echo "  Creating .zshenv.local.$HOSTNAME..."
     cat > "$ZSHENV_LOCAL_FILE" <<TMPL
@@ -120,14 +127,6 @@ if [[ ! -f "$ZSHENV_LOCAL_FILE" ]]; then
 
 TMPL
 fi
-ln -sf "$ZSHENV_LOCAL_FILE" "$HOME/.zshenv.local"
-echo "  Linked .zshenv.local -> .zshenv.local.$HOSTNAME"
-
-# ---- Symlink shared .zshrc (before chsh so zsh startup works immediately) ----
-ln -sf "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
-echo "  Linked .zshrc"
-
-# ---- Symlink machine-specific local config ----
 if [[ ! -f "$LOCAL_FILE" ]]; then
     echo "  Creating .zshrc.local.$HOSTNAME..."
     cat > "$LOCAL_FILE" <<TMPL
@@ -135,16 +134,22 @@ if [[ ! -f "$LOCAL_FILE" ]]; then
 # Machine-specific config for: $HOSTNAME
 # ============================================================
 
-DEFAULT_USER=$USER
-
 # ---- Linuxbrew (if installed) ----
 # if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
 #     eval "\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 # fi
 TMPL
 fi
-ln -sf "$LOCAL_FILE" "$HOME/.zshrc.local"
-echo "  Linked .zshrc.local -> .zshrc.local.$HOSTNAME"
+
+# ---- Link shell configuration (before chsh) ----
+df_legacy_link_exact "$SCRIPT_DIR/.zshenv" "$HOME/.zshenv" ".zshenv"
+df_legacy_link_exact \
+    "$ZSHENV_LOCAL_FILE" "$HOME/.zshenv.local" \
+    ".zshenv.local -> .zshenv.local.$HOSTNAME"
+df_legacy_link_exact "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc" ".zshrc"
+df_legacy_link_exact \
+    "$LOCAL_FILE" "$HOME/.zshrc.local" \
+    ".zshrc.local -> .zshrc.local.$HOSTNAME"
 
 # ---- Set zsh as default shell (last: chsh may prompt for password) ----
 ZSH_PATH="$(which zsh)"

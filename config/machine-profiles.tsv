@@ -1,0 +1,8 @@
+authoring-client	core-tools
+authoring-client	shared-agent-instructions
+service-host	core-tools
+service-host	shared-agent-instructions
+windows-workstation	core-tools
+windows-workstation	shared-agent-instructions
+headless-agent-worker	core-tools
+headless-agent-worker	shared-agent-instructions

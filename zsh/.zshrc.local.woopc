@@ -2,8 +2,6 @@
 # Machine-specific config for: woopc (WSL2)
 # ============================================================
 
-DEFAULT_USER=woohyeok
-
 # ---- Linuxbrew ----
 if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"

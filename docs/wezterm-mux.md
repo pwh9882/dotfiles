@@ -9,7 +9,7 @@
 ## 빠른 요약 (TL;DR)
 
 1. **서버**에 WezTerm 설치 → 유저 서비스로 `wezterm-mux-server` 상시 실행
-2. **로컬** `~/.wezterm.lua`에서 `ssh_domains` 정의(`multiplexing='WezTerm'`)
+2. **로컬** `~/.config/wezterm/machine/local.lua`에서 `ssh_domains` 정의(`multiplexing='WezTerm'`)
 3. 접속: `wezterm connect SSHMUX:<host>`
 4. 재부팅/재로그인 후에도 `wezterm connect …`만으로 기존 세션 재첨부
 
@@ -73,43 +73,36 @@ ss -xlp | grep wezterm
 `~/.ssh/config`
 
 ```sshconfig
-Host ddps-srv-1
-  HostName ddps-srv-1
-  User whpark
+Host build-host
+  HostName build-host.example
+  User developer
   Port 22
 ```
 
 ### 2) WezTerm 설정
 
-`~/.wezterm.lua`
+`~/.config/wezterm/machine/local.lua`
 
 ```lua
-local wezterm = require 'wezterm'
-local config = {}
-
-config.ssh_domains = {
-  {
-    name = 'ddps-srv-1',
-    remote_address = 'ddps-srv-1',  -- ssh config Host 이름
-    username = 'whpark',
-    multiplexing = 'WezTerm',       -- ★ 원격 mux에 연결(영속)
-    -- remote_wezterm_path = '/usr/bin/wezterm', -- PATH 밖이면 지정
+return {
+  ssh_domains = {
+    {
+      name = 'build-host',
+      remote_address = 'build-host', -- ssh config Host alias
+      username = 'developer',
+      multiplexing = 'WezTerm',      -- 원격 mux에 연결
+      -- remote_wezterm_path = '/usr/bin/wezterm', -- PATH 밖이면 지정
+    },
   },
 }
-
--- (선택) 단축키로 붙기/떼기
-config.keys = {
-  {key='U', mods='CTRL|SHIFT', action=wezterm.action.AttachDomain 'ddps-srv-1'},
-  {key='D', mods='CTRL|SHIFT', action=wezterm.action.DetachDomain{Domain='Current'}},
-}
-
-return config
 ```
+
+공개 저장소에는 주소, 사용자명, identity path를 넣지 않습니다. [`machine/local.example.lua`](../.config/wezterm/machine/local.example.lua)를 복사한 뒤 이 머신에서만 필요한 값을 gitignored `local.lua`에 추가합니다.
 
 ### 3) 접속/재접속
 
 ```bash
-wezterm connect SSHMUX:ddps-srv-1  # SSHMUX: 프리픽스가 “원격 mux” 의미
+wezterm connect SSHMUX:build-host  # SSHMUX: 프리픽스가 “원격 mux” 의미
 ```
 
 ---
@@ -172,7 +165,7 @@ root에는 해당 유저의 **user DBus**가 없음.
 
 ### E. 연결해도 세션이 안 이어짐 / 바로 끊김
 
-* 로컬 접속이 **SSHMUX:** 프리픽스를 쓰는지 확인. (`wezterm connect SSHMUX:<host>`)
+* 로컬 접속이 **SSHMUX:** 프리픽스를 쓰는지 확인. (`wezterm connect SSHMUX:<host-alias>`)
 * 원격 mux가 **실행 중**인지 확인(`systemctl --user status …` / 소켓 파일 확인).
 * 로컬/원격 **WezTerm 버전 차이**가 크면 문제 될 수 있음 → 가급적 동일/근접 버전.
 * `remote_wezterm_path`가 필요한 환경이면 지정.
@@ -225,10 +218,10 @@ wezterm cli kill-pane --pane-id <ID>    # 또는 kill-tab / kill-window
 ## 재접속 검증(손쉬운 테스트)
 
 ```bash
-wezterm connect SSHMUX:ddps-srv-1
+wezterm connect SSHMUX:build-host
 echo $WEZTERM_PANE        # Pane ID 기록
 # 로컬 WezTerm 완전 종료
-wezterm connect SSHMUX:ddps-srv-1
+wezterm connect SSHMUX:build-host
 echo $WEZTERM_PANE        # 값이 같으면 같은 세션
 ```
 
@@ -239,4 +232,3 @@ echo $WEZTERM_PANE        # 값이 같으면 같은 세션
 * 로컬 설정(폰트/색/키)은 **클라이언트(UI)**에 적용, 원격 실행(default shell/경로)은 **서버** 설정/환경을 따름.
 * 여러 서버를 쓰면 `ssh_domains`에 여러 항목을 추가하면 된다.
 * `wezterm.default_ssh_domains()`를 쓰면 `~/.ssh/config` 기반으로 도메인을 자동 생성할 수 있다(선호에 따라 선택).
-

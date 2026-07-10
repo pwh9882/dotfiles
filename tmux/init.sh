@@ -5,6 +5,19 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TMUX_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
 OH_MY_TMUX_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/tmux/oh-my-tmux"
 
+# shellcheck source=../lib/dotfiles/legacy_links.sh
+. "$SCRIPT_DIR/../lib/dotfiles/legacy_links.sh"
+
+# Refuse conflicts before package installation, clone, or update work.
+if [[ (-e "$TMUX_CONFIG_DIR" || -L "$TMUX_CONFIG_DIR") && ! -d "$TMUX_CONFIG_DIR" ]]; then
+  echo "❌ tmux config path is not a directory: $TMUX_CONFIG_DIR" >&2
+  exit 1
+fi
+df_legacy_preflight_exact_link \
+  "$OH_MY_TMUX_DIR/.tmux.conf" "$TMUX_CONFIG_DIR/tmux.conf"
+df_legacy_preflight_exact_link \
+  "$SCRIPT_DIR/tmux.conf.local" "$TMUX_CONFIG_DIR/tmux.conf.local"
+
 echo "📦 Setting up tmux with Oh my tmux!..."
 
 # Install tmux if not present
@@ -30,20 +43,20 @@ if [[ ! -d "$OH_MY_TMUX_DIR" ]]; then
   mkdir -p "$(dirname "$OH_MY_TMUX_DIR")"
   git clone https://github.com/gpakosz/.tmux.git "$OH_MY_TMUX_DIR"
 else
-  echo "✅ Oh my tmux! already installed, pulling latest..."
-  git -C "$OH_MY_TMUX_DIR" pull --ff-only || true
+  echo "✅ Oh my tmux! already installed"
+  echo "   Update explicitly with: git -C '$OH_MY_TMUX_DIR' pull --ff-only"
 fi
 
 # Create config directory
 mkdir -p "$TMUX_CONFIG_DIR"
 
 # Symlink tmux.conf -> Oh my tmux!
-ln -sf "$OH_MY_TMUX_DIR/.tmux.conf" "$TMUX_CONFIG_DIR/tmux.conf"
-echo "✅ Symlinked tmux.conf"
+df_legacy_link_exact \
+  "$OH_MY_TMUX_DIR/.tmux.conf" "$TMUX_CONFIG_DIR/tmux.conf" "tmux.conf"
 
 # Symlink tmux.conf.local -> dotfiles
-ln -sf "$SCRIPT_DIR/tmux.conf.local" "$TMUX_CONFIG_DIR/tmux.conf.local"
-echo "✅ Symlinked tmux.conf.local"
+df_legacy_link_exact \
+  "$SCRIPT_DIR/tmux.conf.local" "$TMUX_CONFIG_DIR/tmux.conf.local" "tmux.conf.local"
 
 # Kill existing tmux server to avoid version mismatch
 if tmux list-sessions &>/dev/null 2>&1; then

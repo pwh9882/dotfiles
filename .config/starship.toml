@@ -88,7 +88,7 @@ use_logical_path = true
 fish_style_pwd_dir_length = 0  # 전체 디렉토리명 표시
 
 [directory.substitutions]
-"Library/CloudStorage/GoogleDrive-pwh9882@gmail.com/내 드라이브" = "☁️ GDrive"
+"Library/CloudStorage" = "☁️ CloudStorage"
 "Documents" = "󰈙 Docs"
 "Downloads" = "󰇚 Downloads"
 "Pictures" = "󰉏 Pictures"

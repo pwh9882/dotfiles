@@ -20,8 +20,9 @@ M.colors = {
     flamingo = '#f2cdcd',
 }
 
-function M.apply(config, is_macos)
+function M.apply(config, is_macos, machine)
     local c = M.colors
+    machine = machine or {}
 
     -- Tab bar colors
     config.colors = {
@@ -37,28 +38,8 @@ function M.apply(config, is_macos)
     }
 
     local accents = { c.sapphire, c.green, c.lavender, c.peach, c.flamingo, c.yellow }
-    local host_color_map = {
-        ['ddps'] = c.sapphire,
-        ['ddps0'] = c.green,
-        ['ddps-srv-1'] = c.sapphire,
-        ['ddps-srv-2'] = c.green,
-        ['wini'] = c.lavender,
-        ['mini-ts'] = c.peach,
-        ['uci-gpu'] = c.flamingo,
-        ['norm'] = c.yellow,
-        ['woopc'] = c.green,
-    }
-    local host_os_map = {
-        ['ddps'] = 'linux',
-        ['ddps0'] = 'linux',
-        ['ddps-srv-1'] = 'linux',
-        ['ddps-srv-2'] = 'linux',
-        ['norm'] = 'linux',
-        ['uci-gpu'] = 'linux',
-        ['wini'] = 'darwin',
-        ['mini-ts'] = 'darwin',
-        ['woopc'] = 'linux',
-    }
+    local host_color_map = machine.host_colors or {}
+    local host_os_map = machine.host_os or {}
     local local_host = wezterm.hostname():match('^([^%.]+)') or ''
     local pane_cwd_cache = {}
     local pane_host_cache = {}

@@ -1,0 +1,348 @@
+#!/usr/bin/env bash
+
+# Read-only local/CI verification entry point.
+# Compatible with the Bash 3.2 shipped by macOS.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MODE="full"
+FAILURES=0
+WARNINGS=0
+
+usage() {
+  cat <<'EOF'
+Usage: dotfiles-check [--quick|--full]
+
+Runs read-only syntax, policy, and regression checks for this repository.
+--quick skips slower format and history scans.
+EOF
+}
+
+case "${1:-}" in
+  "") ;;
+  --quick) MODE="quick" ;;
+  --full) MODE="full" ;;
+  -h|--help) usage; exit 0 ;;
+  *) usage >&2; exit 2 ;;
+esac
+
+cd "$ROOT"
+
+pass() {
+  printf 'PASS  %s\n' "$1"
+}
+
+warn() {
+  WARNINGS=$((WARNINGS + 1))
+  printf 'WARN  %s\n' "$1"
+}
+
+fail() {
+  FAILURES=$((FAILURES + 1))
+  printf 'FAIL  %s\n' "$1" >&2
+}
+
+run_check() {
+  local label="$1"
+  shift
+  if "$@"; then
+    pass "$label"
+  else
+    fail "$label"
+  fi
+}
+
+check_bash_syntax() {
+  local file
+  local failed=0
+  while IFS= read -r -d '' file; do
+    case "$file" in
+      *.sh|./bin/*) bash -n "$file" || failed=1 ;;
+    esac
+  done < <(find . -path './.git' -prune -o -type f -print0)
+  return "$failed"
+}
+
+check_zsh_syntax() {
+  local file
+  local failed=0
+  command -v zsh >/dev/null 2>&1 || return 2
+  while IFS= read -r file; do
+    case "$file" in
+      zsh/.zsh*) zsh -n "$file" || failed=1 ;;
+    esac
+  done < <(git ls-files --cached --others --exclude-standard -- 'zsh/*')
+  return "$failed"
+}
+
+check_fish_syntax() {
+  local file
+  local failed=0
+  command -v fish >/dev/null 2>&1 || return 2
+  while IFS= read -r file; do
+    fish -n "$file" || failed=1
+  done < <(git ls-files --cached --others --exclude-standard -- '*.fish')
+  return "$failed"
+}
+
+lua_command() {
+  if command -v lua >/dev/null 2>&1; then
+    printf '%s\n' lua
+  elif command -v lua5.4 >/dev/null 2>&1; then
+    printf '%s\n' lua5.4
+  else
+    return 1
+  fi
+}
+
+luac_command() {
+  if command -v luac >/dev/null 2>&1; then
+    printf '%s\n' luac
+  elif command -v luac5.4 >/dev/null 2>&1; then
+    printf '%s\n' luac5.4
+  else
+    return 1
+  fi
+}
+
+check_lua_syntax() {
+  local compiler
+  local file
+  local failed=0
+  compiler="$(luac_command)" || return 2
+  while IFS= read -r file; do
+    "$compiler" -p "$file" || failed=1
+  done < <(git ls-files --cached --others --exclude-standard -- '*.lua')
+  return "$failed"
+}
+
+check_lua_tests() {
+  local interpreter
+  interpreter="$(lua_command)" || return 2
+  "$interpreter" .config/wezterm/theme_test.lua &&
+    "$interpreter" .config/wezterm/projects_test.lua
+}
+
+check_json() {
+  local file
+  local failed=0
+  command -v jq >/dev/null 2>&1 || return 2
+  while IFS= read -r file; do
+    case "$file" in
+      .config/zed/*.json) continue ;; # Zed accepts JSON with comments.
+    esac
+    jq empty "$file" >/dev/null || failed=1
+  done < <(git ls-files --cached --others --exclude-standard -- '*.json')
+  return "$failed"
+}
+
+check_tracked_symlinks() {
+  local meta
+  local path
+  local mode
+  local failed=0
+  while IFS=$'\t' read -r meta path; do
+    mode="${meta%% *}"
+    [ "$mode" = "120000" ] || continue
+    # The worktree may intentionally change a tracked symlink into a regular
+    # file before it is staged; only absence or a dangling link is broken.
+    if [ ! -e "$path" ]; then
+      printf '  broken tracked symlink: %s -> %s\n' "$path" "$(readlink "$path" 2>/dev/null || true)" >&2
+      failed=1
+    fi
+  done < <(git ls-files -s)
+  return "$failed"
+}
+
+check_common_paths() {
+  ! git grep -n -E '/Users/[^/]+/' -- \
+    zsh/.zshrc bash/.bashrc .config/fish/config.fish
+}
+
+check_zed_source() {
+  [ -f .config/zed/settings.json ] && [ ! -L .config/zed/settings.json ]
+}
+
+check_wezterm_policy() {
+  local interval
+  interval="$(sed -n 's/.*status_update_interval[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' .config/wezterm/wezterm.lua | head -n 1)"
+  [ -n "$interval" ] || return 1
+  [ "$interval" -ge 250 ] || return 1
+  ! grep -Eq 'restore_text[[:space:]]*=[[:space:]]*true' .config/wezterm/plugins.lua || return 1
+  grep -Eq 'set_max_nlines\(0\)' .config/wezterm/plugins.lua || return 1
+  grep -Fq "require 'machine_config'" .config/wezterm/wezterm.lua || return 1
+  grep -Fq '.config/wezterm/machine/local.lua' .gitignore || return 1
+  [ -f .config/wezterm/machine/local.example.lua ] || return 1
+  grep -Fq "os.getenv('XDG_STATE_HOME')" .config/wezterm/projects.lua || return 1
+  grep -Fq "projects_logic.workspace_name" .config/wezterm/projects.lua || return 1
+  ! grep -Fq "name = id:match('([^/]+)$')" .config/wezterm/projects.lua || return 1
+  if git ls-files --error-unmatch .config/wezterm/machine/local.lua >/dev/null 2>&1; then
+    return 1
+  fi
+  ! grep -Eq 'remote_address|identityfile' \
+    .config/wezterm/wezterm.lua .config/wezterm/projects.lua \
+    .config/wezterm/theme.lua .config/wezterm/theme_logic.lua \
+    .config/wezterm/theme_test.lua .config/wezterm/machine_config.lua || return 1
+  # Keep the check structural so the scanner itself never becomes a catalog
+  # of private machine identifiers. Host-specific tables belong only in the
+  # ignored overlay; shared files must not contain personal paths, addresses,
+  # or network endpoints.
+  ! git grep -n -E \
+    'GoogleDrive-|/Users/[^/]+/|[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}|([0-9]{1,3}\.){3}[0-9]{1,3}' \
+    -- '.config/wezterm/*.lua' \
+       ':!.config/wezterm/machine/local.example.lua' \
+       ':!.config/wezterm/theme_test.lua'
+}
+
+check_tmux_policy() {
+  grep -Fq '%if #{>=:#{version},3.3}' tmux/tmux.conf.local || return 1
+  grep -Fq "@resurrect-capture-pane-contents 'off'" tmux/tmux.conf.local || return 1
+  grep -Fq 'tmux_conf_update_plugins_on_launch=false' tmux/tmux.conf.local || return 1
+  grep -Fq 'tmux_conf_update_plugins_on_reload=false' tmux/tmux.conf.local
+}
+
+check_wsl_npiperelay_policy() {
+  ! grep -Fq 'npiperelay@latest' ssh/init.sh ssh/README.md || return 1
+  grep -Fq "echo %USERPROFILE%\\bin" ssh/init.sh || return 1
+  grep -Fq '/mnt/c/*)' ssh/init.sh || return 1
+  grep -Fq 'GOOS=windows GOARCH=amd64 GOBIN="$windows_bin"' ssh/init.sh || return 1
+  grep -Fq 'go install github.com/jstarks/npiperelay@v0.1.0' ssh/init.sh || return 1
+  grep -Eq 'curl -[^[:space:]]*f[^[:space:]]*[[:space:]]' ssh/init.sh || return 1
+  grep -Fq '6b9ef61ffd17c03507a9a3d54d815dceb3dae669ac67fc3bf4225d1e764ce5f6' ssh/init.sh || return 1
+  grep -Fq 'sha256sum -c -' ssh/init.sh || return 1
+  grep -Fq 'unzip -qo "$tmpdir/npiperelay.zip" -d "$windows_bin"' ssh/init.sh || return 1
+  grep -Fq 'npiperelay_target="$windows_bin/npiperelay.exe"' ssh/init.sh || return 1
+  grep -Fq '! -f "$npiperelay_target" || -L "$npiperelay_target" || ! -s "$npiperelay_target"' ssh/init.sh || return 1
+  grep -Fq 'npiperelay_link="$HOME/.local/bin/npiperelay.exe"' ssh/init.sh || return 1
+  grep -Fq 'ln -s "$npiperelay_target" "$npiperelay_link"' ssh/init.sh || return 1
+  ! grep -Eq '(curl|mv|cp|install).*(\$HOME|~)/\.local/bin/npiperelay\.exe' ssh/init.sh
+}
+
+check_wsl_agent_socket_policy() {
+  grep -Fq 'ss -xl' zsh/.zshrc || return 1
+  grep -Fq 'ss -xl' bash/.bashrc || return 1
+  grep -Fq '_dotfiles_agent_live' zsh/.zshrc || return 1
+  grep -Fq '_dotfiles_agent_live' bash/.bashrc
+}
+
+check_domain_docs() {
+  [ -f CONTEXT.md ] || return 1
+  [ -f docs/adr/0001-single-context-domain-model.md ] || return 1
+  [ -f docs/agents/domain.md ] || return 1
+  grep -Fq 'single-context' CLAUDE.md
+}
+
+check_legacy_link_policy() {
+  local file
+  [ -f lib/dotfiles/legacy_links.sh ] || return 1
+  for file in zsh/init.sh bash/init.sh .config/init.sh tmux/init.sh claude/init.sh; do
+    grep -Fq 'lib/dotfiles/legacy_links.sh' "$file" || return 1
+  done
+  ! grep -Eq 'ln[[:space:]]+-[^[:space:]]*f' \
+    zsh/init.sh bash/init.sh .config/init.sh tmux/init.sh claude/init.sh || return 1
+  ! grep -Eq 'rm[[:space:]]+-[^[:space:]]*f.*(starship\.toml|settings\.json)' \
+    .config/init.sh || return 1
+  grep -Fq '# dotfiles-managed:starship-override=' .config/init.sh || return 1
+  grep -Fq 'merge shared values' .config/init.sh || return 1
+  grep -Fq 'mktemp "$CLAUDE_DIR/.settings.json.XXXXXX"' claude/init.sh || return 1
+  ! grep -Eq '^[[:space:]]*git[[:space:]]+-C' tmux/init.sh
+}
+
+check_transactional_bin_tests() {
+  /bin/bash tests/dotfiles/run.sh
+}
+
+check_transactional_agents_links_tests() {
+  /bin/bash tests/dotfiles/agents-links.sh
+}
+
+check_root_init_tests() {
+  /bin/bash tests/init/run.sh
+}
+
+check_machine_profile_tests() {
+  /bin/bash tests/profile/run.sh
+}
+
+check_feature_registry() {
+  DF_ROOT="$ROOT"
+  export DF_ROOT
+  # shellcheck disable=SC1091
+  . "$ROOT/lib/dotfiles/features.sh"
+  df_features_doctor
+}
+
+check_feature_registry_tests() {
+  /bin/bash tests/features/run.sh
+}
+
+check_workspace_registry() {
+  DF_ROOT="$ROOT"
+  export DF_ROOT
+  # shellcheck disable=SC1091
+  . "$ROOT/lib/dotfiles/workspaces.sh"
+  df_workspaces_validate_registry "$ROOT/config/workspaces.tsv" public 1 &&
+    df_workspaces_validate_registry "$ROOT/config/workspaces.local.example.tsv" local 0
+}
+
+check_workspace_context_tests() {
+  /bin/bash tests/workspaces/run.sh
+}
+
+check_legacy_link_tests() {
+  /bin/bash tests/legacy-links/run.sh
+}
+
+check_shell_privacy_tests() {
+  /bin/bash tests/privacy/run.sh
+}
+
+run_optional_check() {
+  local label="$1"
+  shift
+  "$@"
+  case "$?" in
+    0) pass "$label" ;;
+    2) warn "$label (required tool unavailable)" ;;
+    *) fail "$label" ;;
+  esac
+}
+
+run_check "Bash syntax" check_bash_syntax
+run_optional_check "Zsh syntax" check_zsh_syntax
+run_optional_check "Fish syntax" check_fish_syntax
+run_optional_check "Lua syntax" check_lua_syntax
+run_optional_check "WezTerm logic tests" check_lua_tests
+run_check "Tracked symlinks resolve" check_tracked_symlinks
+run_check "Common shell configs contain no absolute macOS home" check_common_paths
+run_check "Zed settings source is a regular file" check_zed_source
+run_check "WezTerm status/session privacy policy" check_wezterm_policy
+run_check "tmux version/update/session privacy policy" check_tmux_policy
+run_check "WSL npiperelay Windows-filesystem policy" check_wsl_npiperelay_policy
+run_check "WSL SSH agent stale-socket policy" check_wsl_agent_socket_policy
+run_check "Single-context domain docs" check_domain_docs
+run_check "Fail-closed legacy link policy" check_legacy_link_policy
+run_check "Feature Registry" check_feature_registry
+run_check "Workspace Registry" check_workspace_registry
+run_check "Public shell profile privacy policy" check_shell_privacy_tests
+
+if [ "$MODE" = "full" ]; then
+  run_check "Transactional bin Module tests" check_transactional_bin_tests
+  run_check "Transactional agents-links Module tests" check_transactional_agents_links_tests
+  run_check "Root init orchestration tests" check_root_init_tests
+  run_check "Machine Profile tests" check_machine_profile_tests
+  run_check "Feature Registry tests" check_feature_registry_tests
+  run_check "Workspace Context tests" check_workspace_context_tests
+  run_check "Fail-closed legacy link tests" check_legacy_link_tests
+  run_optional_check "JSON syntax" check_json
+  if command -v gitleaks >/dev/null 2>&1; then
+    run_check "Git secret scan" gitleaks git --no-banner --redact
+  else
+    warn "Git secret scan (gitleaks unavailable; CI runs it separately)"
+  fi
+fi
+
+printf '\n%d failure(s), %d warning(s)\n' "$FAILURES" "$WARNINGS"
+[ "$FAILURES" -eq 0 ]

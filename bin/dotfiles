@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+# Stable user-facing entry point. Commands are enabled only after their
+# filesystem behavior is transaction-tested.
+
+set -uo pipefail
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE_TARGET="$(readlink "$SOURCE")"
+  case "$SOURCE_TARGET" in
+    /*) SOURCE="$SOURCE_TARGET" ;;
+    *) SOURCE="$SOURCE_DIR/$SOURCE_TARGET" ;;
+  esac
+done
+
+BIN_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+DF_ROOT="$(cd "$BIN_DIR/.." && pwd)"
+export DF_ROOT
+
+source "$DF_ROOT/lib/dotfiles/runtime.sh"
+df_main "$@"

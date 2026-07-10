@@ -1,11 +1,13 @@
 # WezTerm Configuration
 
-This WezTerm configuration provides tmux-like session management with advanced workspace switching and session resurrection capabilities.
+This WezTerm configuration provides shared macOS and Windows settings. The tmux-like workspace switcher and session resurrection features are enabled on macOS.
+
+처음 사용하는 경우 [상태 바, 프로젝트 picker, session 복원 5분 온보딩](../../docs/runbooks/use-wezterm-workflows.md)부터 진행한다. 이 문서는 각 기능의 세부 동작과 원격 감지 규칙을 이어서 설명한다.
 
 ## Features
 
 - **Project-based workspace management** with zoxide integration
-- **Session resurrection** - automatically save and restore terminal sessions
+- **Session resurrection** - automatically save and restore layout/process metadata without pane text
 - **Tmux-like keybindings** with `Ctrl+A` as leader key
 - **Automatic session persistence** every 15 minutes
 - **Smart workspace switching** with fuzzy finder
@@ -32,21 +34,21 @@ This WezTerm configuration provides tmux-like session management with advanced w
    zoxide init fish | source
    ```
 
-3. The WezTerm plugins are automatically loaded via the configuration.
+3. On macOS, the WezTerm plugins are automatically loaded via the configuration.
 
 ## Keybindings
 
 ### Leader Key
 - **Leader**: `Ctrl+A` (timeout: 1000ms)
 
-### Workspace Management (tmux session equivalent)
+### Workspace Management (tmux session equivalent, macOS)
 | Key | Action | Description |
 |-----|--------|-------------|
 | `Ctrl+A` + `s` | Switch workspace | Open fuzzy finder to switch to any directory (zoxide-based) |
 | `Ctrl+A` + `S` | Previous workspace | Switch to previously active workspace |
 | `Ctrl+A` + `f` | Switch workspace | Alternative workspace switcher |
 
-### Session Management
+### Session Management (macOS)
 | Key | Action | Description |
 |-----|--------|-------------|
 | `Alt+w` | Save workspace | Save current workspace state |
@@ -95,6 +97,7 @@ Then in WezTerm:
 - **Automatic**: Sessions are restored when WezTerm starts
 - **Manual**: Use `Alt+o` to restore specific saved sessions
 - **Backup**: Use `Alt+s` to manually save current session
+- **Capture policy**: Pane scrollback and terminal text are neither saved nor restored
 
 ### 3. Workspace Switching
 - `Ctrl+A` + `s`: Opens fuzzy finder with your most visited directories
@@ -108,13 +111,23 @@ Then in WezTerm:
 - Sessions are automatically saved every 15 minutes
 - Workspace state is saved when switching workspaces
 - Session is restored on WezTerm startup
-- Up to 1000 lines of terminal output are preserved per pane
+- Pane layout and process metadata are preserved; pane scrollback and terminal text are excluded
 
 ### Workspace Integration
 - When creating new workspace, attempts to restore previous session
 - If no saved session exists, opens in the project directory
-- Workspace name is displayed in the status bar
+- The status bar shows the active pane's host, OS, and current directory
 - Custom workspace formatting with icons
+
+### Project history and workspace IDs
+
+`Ctrl+A` + `p`에서 사용하는 최근 프로젝트 기록은 runtime state로 관리합니다.
+
+- `$XDG_STATE_HOME`이 있으면 `$XDG_STATE_HOME/wezterm/project_history.txt`에 저장합니다.
+- 없으면 `~/.local/state/wezterm/project_history.txt`에 저장합니다.
+- 과거의 `~/.config/wezterm/project_history.txt`는 새 state 파일이 없을 때만 읽습니다. 다음 기록 시 새 위치에 같은 목록을 저장하며, 기존 파일은 자동 삭제하지 않습니다.
+
+picker에는 기존처럼 프로젝트 경로와 SSH host를 표시합니다. 실제 WezTerm workspace ID는 `local:~/development/project`와 `ssh:host-alias` 형식을 사용합니다. 같은 이름의 프로젝트가 서로 다른 상위 디렉터리에 있어도 workspace와 session이 충돌하지 않습니다. 기존 basename workspace state는 삭제하지 않으며 `Alt+o`에서 수동으로 복원할 수 있습니다.
 
 ### Error Handling
 - Resurrection errors are shown as toast notifications
@@ -260,10 +273,23 @@ dotfiles 없는 서버도 title 패턴 감지로 호스트/CWD가 동작한다 (
 
 - **Main config**: `wezterm.lua`
 - **Theme & tab badges**: `theme.lua`
+- **Theme detection logic and tests**: `theme_logic.lua`, `theme_test.lua`
 - **Keybindings**: `keys.lua`
 - **Plugins**: `plugins.lua`
 - **Appearance**: `appearance.lua`
 - **Projects**: `projects.lua`
+- **Machine-local loader**: `machine_config.lua`
+- **Local overlay template**: `machine/local.example.lua`
+
+SSH domain 주소·사용자명·identity path, 개인 프로젝트 경로, private host 표시값은 공개 파일에 넣지 않는다. 새 머신에서는 template을 복사해 gitignored overlay를 만든다.
+
+```bash
+cp ~/.config/wezterm/machine/local.example.lua ~/.config/wezterm/machine/local.lua
+```
+
+overlay는 WezTerm을 실행하는 OS별 local 파일입니다. WSL에서 Windows 쪽 공통 Lua를 동기화할 때도 Windows의 `machine/local.lua`는 덮어쓰지 않습니다. 현재 SSH domain overlay는 macOS에서만 적용하며, Windows는 WSL domain과 Windows-side local 설정을 분리합니다.
+
+overlay가 없어도 공통 terminal, 동적 `~/development/20*/*` 탐색, `~/.ssh/config` host picker는 동작합니다.
 
 ## Troubleshooting
 
@@ -279,9 +305,8 @@ dotfiles 없는 서버도 title 패턴 감지로 호스트/CWD가 동작한다 (
 3. Check if fuzzy finder opens (should show directory list)
 
 ### Performance issues
-- Saved sessions are limited to 1000 lines per pane
+- Saved sessions do not contain pane scrollback or terminal text
 - Old sessions can be deleted with `Alt+d`
-- Consider disabling encryption if not needed
 
 ## Customization
 

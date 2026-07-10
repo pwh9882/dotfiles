@@ -31,13 +31,25 @@ function M.is_same_host(a, b)
     return na ~= '' and nb ~= '' and na == nb
 end
 
---- Infer remote host from a WezTerm domain name.
---- SSH domains are remote even before the remote shell has emitted user vars.
-function M.detect_domain_remote(domain_name, local_host)
-    if not domain_name or domain_name == '' then return nil end
+--- Classify the execution transport represented by a WezTerm domain.
+--- Unprefixed named domains are SSH domains in this configuration.
+function M.domain_kind(domain_name, local_host)
+    if not domain_name or domain_name == '' then return 'local' end
     local domain = tostring(domain_name)
-    if domain == 'local' or M.is_same_host(domain, local_host) then return nil end
+    if domain == 'local' or M.is_same_host(domain, local_host) then return 'local' end
+    if domain:match('^WSL:') then return 'wsl' end
+    if domain:match('^SSHMUX:') then return 'sshmux' end
+    return 'ssh'
+end
 
+--- Infer remote host from a WezTerm domain name.
+--- SSH domains are remote even before the remote shell has emitted user vars;
+--- WSL is a local execution Adapter and must not become a remote hostname.
+function M.detect_domain_remote(domain_name, local_host)
+    local kind = M.domain_kind(domain_name, local_host)
+    if kind == 'local' or kind == 'wsl' then return nil end
+
+    local domain = tostring(domain_name)
     local host = domain:gsub('^SSH:', ''):gsub('^SSHMUX:', '')
     if host ~= '' and not M.is_same_host(host, local_host) then return host end
     return nil
@@ -116,7 +128,7 @@ function M.resolve_cwd(remote, title, uv, cached_cwd, workspace)
         -- 2) WEZTERM_CWD if host matches
         if not cwd or cwd == '' then
             local uv_host = uv and uv.WEZTERM_HOST or ''
-            if uv_host == remote and uv.WEZTERM_CWD and uv.WEZTERM_CWD ~= '' then
+            if M.is_same_host(uv_host, remote) and uv.WEZTERM_CWD and uv.WEZTERM_CWD ~= '' then
                 cwd = uv.WEZTERM_CWD
             end
         end

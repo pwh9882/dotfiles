@@ -5,6 +5,10 @@ local M = {}
 -- 셸 프로세스 이름 (login shell의 "-zsh" 포함)
 local shell_procs = { ["-zsh"] = true, ["zsh"] = true, ["-bash"] = true, ["bash"] = true, ["-fish"] = true, ["fish"] = true }
 
+local function posix_shell_quote(value)
+    return "'" .. tostring(value):gsub("'", "'\"'\"'") .. "'"
+end
+
 function M.apply(config)
     local resurrect = wezterm.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
     local workspace_switcher = wezterm.plugin.require("https://github.com/MLFlexer/smart_workspace_switcher.wezterm")
@@ -34,7 +38,9 @@ function M.apply(config)
             id = string.match(id, "(.+)%..+$")
             local opts = {
                 relative = true,
-                restore_text = true,
+                -- Layout/process metadata is useful; terminal text may contain
+                -- tokens or other sensitive output and is never restored.
+                restore_text = false,
                 close_open_tabs = true,
                 on_pane_restore = function(pane, proc)
                         if not shell_procs[proc] then
@@ -83,7 +89,7 @@ function M.apply(config)
             resurrect.workspace_state.restore_workspace(state, {
                 window = window,
                 relative = true,
-                restore_text = true,
+                restore_text = false,
                 resize_window = false,
                 close_open_tabs = true,
                 on_pane_restore = function(pane, proc)
@@ -95,7 +101,7 @@ function M.apply(config)
         else
             local tab = window:active_tab()
             local pane = tab:active_pane()
-            pane:send_text("cd " .. path .. "\n")
+            pane:send_text("cd -- " .. posix_shell_quote(path) .. "\n")
         end
     end)
 
@@ -170,7 +176,8 @@ function M.apply(config)
         save_tabs = true,
     })
     wezterm.on("gui-startup", resurrect.state_manager.resurrect_on_gui_startup)
-    resurrect.state_manager.set_max_nlines(1000)
+    -- Do not persist pane scrollback in plaintext session state.
+    resurrect.state_manager.set_max_nlines(0)
 
     wezterm.on("resurrect.error", function(err)
         wezterm.log_error("Resurrect error: " .. err)

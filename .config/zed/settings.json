@@ -1,1 +1,43 @@
-/Users/woohyeok/dotfiles/.config/zed/settings.json
+// Shared Zed settings. Machine-specific SSH connections stay in the local
+// Zed settings store and are not committed to this public repository.
+{
+  "agent_servers": {
+    "codex": {
+      "command": "codex",
+      "args": [],
+      "env": {}
+    },
+    "claude": {
+      "command": "claude",
+      "args": [],
+      "env": {}
+    }
+  },
+  "icon_theme": "Catppuccin Latte",
+  "agent": {
+    "profiles": {
+      "test": {
+        "name": "test",
+        "tools": {},
+        "enable_all_context_servers": false,
+        "context_servers": {}
+      }
+    },
+    "default_profile": "write"
+  },
+  "vim_mode": false,
+  "features": {
+    "edit_prediction_provider": "zed"
+  },
+  "theme": "Github Dark Dimmed",
+  "telemetry": {
+    "metrics": false,
+    "diagnostics": false
+  },
+  "base_keymap": "VSCode",
+  "ui_font_size": 14,
+  "buffer_font_size": 12,
+  "terminal": {
+    "font_family": "JetBrainsMonoNL Nerd Font"
+  }
+}

@@ -6,6 +6,7 @@
 .config/karabiner/automatic_backups/
 .config/wezterm/wezterm.lua.backup
 .config/wezterm/project_history.txt
+.config/wezterm/machine/local.lua
 .config/zed/embeddings/
 .config/zed/conversations/
 .config/zed/prompts/
@@ -19,3 +20,6 @@
 
 # zsh machine-local environment
 zsh/.zshenv.local.*
+
+# Fish machine-local environment
+.config/fish/config.local.fish

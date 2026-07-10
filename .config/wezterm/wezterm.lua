@@ -8,6 +8,7 @@ local is_windows = wezterm.target_triple:find('-windows-') ~= nil
 local is_macos   = wezterm.target_triple:find('-apple-')   ~= nil
 
 -- ---- Modules ----
+local machine = require 'machine_config'
 local theme = require 'theme'
 local keys = require 'keys'
 
@@ -20,7 +21,9 @@ config.window_decorations = 'RESIZE'
 config.use_fancy_tab_bar = false
 config.tab_max_width = 60
 config.warn_about_missing_glyphs = false
-config.status_update_interval = 5
+-- Milliseconds. Keep the status renderer off the hot path; it only renders
+-- cached pane metadata and does not need sub-second polling.
+config.status_update_interval = 1000
 
 -- ---- Rendering (120Hz 고주사율 대응; 모니터 refresh rate를 안 넘게 자동 캡) ----
 config.max_fps = 120
@@ -42,46 +45,19 @@ else
 end
 
 -- ---- Apply modules ----
-theme.apply(config, is_macos)
+theme.apply(config, is_macos, machine)
 keys.apply(config, is_macos)
 
 if is_macos then
     local ok, plugins = pcall(require, 'plugins')
     if ok then plugins.apply(config) end
 
-    config.ssh_domains = {
-        {
-            name = 'ddps',
-            remote_address = 'ddpssrv1.ddps.cloud:33021',
-            username = 'whpark',
-            ssh_option = { identityfile = '~/.ssh/ddps-srv-1_ed25519' },
-            connect_automatically = false,
-        },
-        {
-            name = 'ddps0',
-            remote_address = 'srv2.ddps.cloud:33022',
-            username = 'whpark',
-            ssh_option = { identityfile = '~/.ssh/ddps-srv-1_ed25519' },
-            connect_automatically = false,
-        },
-        {
-            name = 'norm',
-            remote_address = 'normalize.duckdns.org',
-            ssh_option = { identityfile = '/Users/woohyeok/local/oracleA1/ssh-key-2024-09-04.key' },
-            username = 'ubuntu',
-        },
-        {
-            name = 'mini-ts',
-            remote_address = '100.74.23.65',
-            username = 'woohyeok',
-            remote_wezterm_path = '/opt/homebrew/bin/wezterm',
-        },
-        {
-            name = 'uci-gpu',
-            remote_address = '100.114.244.128',
-            username = 'hyunwooo',
-        },
-    }
+end
+
+-- SSH domain identity paths in the current overlay are POSIX/macOS-specific.
+-- Windows can keep its own machine/local.lua when a Windows schema is added.
+if is_macos and machine.ssh_domains and #machine.ssh_domains > 0 then
+    config.ssh_domains = machine.ssh_domains
 end
 
 -- ---- Windows-only: WSL domain & launch menu ----

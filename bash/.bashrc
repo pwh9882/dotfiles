@@ -57,21 +57,40 @@ export COLORTERM=truecolor
 [[ -f "$HOME/.bashrc.local" ]] && source "$HOME/.bashrc.local"
 
 # ---- SSH_AUTH_SOCK for Bitwarden SSH Agent ----
-if grep -qi microsoft /proc/version 2>/dev/null; then
-    # WSL2: Windows Bitwarden Desktop → npiperelay + socat 브릿지
-    export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
-    if ! ss -a 2>/dev/null | grep -q "$SSH_AUTH_SOCK"; then
-        rm -f "$SSH_AUTH_SOCK"
-        mkdir -p "$HOME/.ssh"
-        setsid socat \
-            UNIX-LISTEN:"$SSH_AUTH_SOCK",fork \
-            EXEC:"npiperelay.exe -ei -s //./pipe/openssh-ssh-agent",nofork &>/dev/null &
+# Preserve a valid forwarded or user-provided agent. Fall back to a local
+# Bitwarden socket only when the current socket is absent or stale.
+if [[ -z "${SSH_AUTH_SOCK:-}" || ! -S "$SSH_AUTH_SOCK" ]]; then
+    if grep -qi microsoft /proc/version 2>/dev/null; then
+        # WSL2: Windows Bitwarden Desktop → npiperelay + socat bridge
+        _dotfiles_agent_sock="$HOME/.ssh/agent.sock"
+        _dotfiles_agent_live=0
+        if [[ -S "$_dotfiles_agent_sock" ]]; then
+            if command -v ss &>/dev/null; then
+                if ss -xl 2>/dev/null | grep -F -- "$_dotfiles_agent_sock" >/dev/null; then
+                    _dotfiles_agent_live=1
+                fi
+            else
+                _dotfiles_agent_live=1
+            fi
+        fi
+        if [[ "$_dotfiles_agent_live" -ne 1 ]]; then
+            rm -f "$_dotfiles_agent_sock"
+            mkdir -p "$HOME/.ssh"
+            setsid socat \
+                UNIX-LISTEN:"$_dotfiles_agent_sock",fork \
+                EXEC:"npiperelay.exe -ei -s //./pipe/openssh-ssh-agent",nofork &>/dev/null &
+        fi
+        export SSH_AUTH_SOCK="$_dotfiles_agent_sock"
+    else
+        for _dotfiles_agent_sock in \
+            "$HOME/.bitwarden-ssh-agent.sock" \
+            "$HOME/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock"
+        do
+            if [[ -S "$_dotfiles_agent_sock" ]]; then
+                export SSH_AUTH_SOCK="$_dotfiles_agent_sock"
+                break
+            fi
+        done
     fi
-else
-    # Native Linux: Bitwarden Desktop 앱의 SSH Agent 소켓
-    export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"
 fi
-
-
-# Added by Antigravity CLI installer
-export PATH="/Users/woohyeok/.local/bin:$PATH"
+unset _dotfiles_agent_sock _dotfiles_agent_live

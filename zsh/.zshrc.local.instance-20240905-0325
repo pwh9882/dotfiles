@@ -2,8 +2,6 @@
 # Machine-specific config for: instance-20240905-0325
 # ============================================================
 
-DEFAULT_USER=root
-
 # ---- Linuxbrew (if installed) ----
 # if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
 #     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"

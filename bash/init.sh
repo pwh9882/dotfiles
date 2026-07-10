@@ -5,6 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOSTNAME="$(hostname -s)"
 LOCAL_FILE="$SCRIPT_DIR/.bashrc.local.$HOSTNAME"
 
+# shellcheck source=../lib/dotfiles/legacy_links.sh
+. "$SCRIPT_DIR/../lib/dotfiles/legacy_links.sh"
+
+# Check both HOME destinations before package installation or link writes.
+df_legacy_preflight_exact_link "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc"
+df_legacy_preflight_exact_link "$LOCAL_FILE" "$HOME/.bashrc.local"
+
 # ---- Install packages ----
 install_starship() {
     if ! command -v starship &>/dev/null; then
@@ -37,11 +44,7 @@ install_starship
 install_zoxide
 install_lsd
 
-# ---- Symlink shared .bashrc ----
-ln -sf "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc"
-echo "  Linked .bashrc"
-
-# ---- Symlink machine-specific local config ----
+# ---- Create the machine-specific source file when missing ----
 if [[ ! -f "$LOCAL_FILE" ]]; then
     echo "  Creating .bashrc.local.$HOSTNAME..."
     cat > "$LOCAL_FILE" <<TMPL
@@ -55,5 +58,9 @@ if [[ ! -f "$LOCAL_FILE" ]]; then
 # fi
 TMPL
 fi
-ln -sf "$LOCAL_FILE" "$HOME/.bashrc.local"
-echo "  Linked .bashrc.local -> .bashrc.local.$HOSTNAME"
+
+# ---- Link shell configuration ----
+df_legacy_link_exact "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc" ".bashrc"
+df_legacy_link_exact \
+    "$LOCAL_FILE" "$HOME/.bashrc.local" \
+    ".bashrc.local -> .bashrc.local.$HOSTNAME"

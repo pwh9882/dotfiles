@@ -38,7 +38,8 @@ usage() {
 Usage: llm-instance [--id|--details]
 
 Reads the machine-local LLM-WIKI instance id, validates it against the
-matching instance document and hostname, then prints the id.
+matching instance document and hostname, then prints the id. --details also
+prints the validated role token from the instance document.
 EOF
 }
 
@@ -85,18 +86,31 @@ if [[ "$document_id" != "$instance_id" ]]; then
   exit 4
 fi
 
-document_hostname="$(awk '$1 == "hostname:" { print $2; exit }' "$instance_doc")"
+hostname_field_count="$(awk '$1 == "hostname:" { count++ } END { print count + 0 }' "$instance_doc")"
+document_hostname="$(awk '$1 == "hostname:" && NF == 2 { print $2; exit }' "$instance_doc")"
+if [[ "$hostname_field_count" != "1" || -z "$document_hostname" ]]; then
+  echo "llm-instance: instance document must contain one hostname token" >&2
+  exit 4
+fi
+
 actual_hostname="$(hostname -s 2>/dev/null || hostname)"
 normalized_document_hostname="$(printf '%s' "$document_hostname" | tr '[:upper:]' '[:lower:]')"
 normalized_actual_hostname="$(printf '%s' "$actual_hostname" | tr '[:upper:]' '[:lower:]')"
 
-if [[ -n "$normalized_document_hostname" && "$normalized_document_hostname" != "$normalized_actual_hostname" ]]; then
+if [[ "$normalized_document_hostname" != "$normalized_actual_hostname" ]]; then
   echo "llm-instance: hostname mismatch for $instance_id: expected $document_hostname, found $actual_hostname" >&2
   exit 4
 fi
 
 if [[ "$mode" == "--details" ]]; then
-  printf 'instance_id=%s\nhostname=%s\ninstance_doc=%s\n' "$instance_id" "$actual_hostname" "$instance_doc"
+  role_field_count="$(awk '$1 == "role:" { count++ } END { print count + 0 }' "$instance_doc")"
+  document_role="$(awk '$1 == "role:" && NF == 2 { print $2; exit }' "$instance_doc")"
+  if [[ "$role_field_count" != "1" || ! "$document_role" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+    echo "llm-instance: instance document must contain one valid role token" >&2
+    exit 4
+  fi
+  printf 'instance_id=%s\nhostname=%s\ninstance_doc=%s\nrole=%s\n' \
+    "$instance_id" "$actual_hostname" "$instance_doc" "$document_role"
 else
   printf '%s\n' "$instance_id"
 fi

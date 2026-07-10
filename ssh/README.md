@@ -36,7 +36,17 @@ Bitwarden Desktop → ~/.bitwarden-ssh-agent.sock → ssh client
 
 WSL2 의존성:
 - `socat`: `sudo apt install -y socat`
-- `npiperelay`: `go install github.com/jstarks/npiperelay@latest`
+- `npiperelay`: `bash ssh/init.sh` 실행 시 v0.1.0을 설치
+
+`ssh/init.sh`는 `cmd.exe`에서 `%USERPROFILE%` 경로를 확인한 뒤 Windows
+파일 시스템의 `%USERPROFILE%\bin\npiperelay.exe`에 실행 파일을 둡니다.
+WSL의 `~/.local/bin/npiperelay.exe`는 해당 파일을 가리키는 심볼릭 링크입니다.
+Go가 없으면 고정된 release ZIP을 받고 SHA-256을 확인한 뒤 압축을 풉니다.
+
+```bash
+readlink "$HOME/.local/bin/npiperelay.exe"
+# /mnt/c/Users/<Windows 사용자>/bin/npiperelay.exe
+```
 
 ### 설정
 

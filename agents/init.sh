@@ -1,27 +1,36 @@
 #!/bin/bash
 # Wire the shared global agents file (the LLM-WIKI pointer) into every harness.
-# Canonical source: ~/dotfiles/agents/AGENTS.md — one file, four consumers.
-# Idempotent; safe to re-run.
-set -e
+# Claude/Codex links are transactional; Hermes/OpenClaw remain legacy
+# post-config because they modify user-owned files in place.
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SRC="$SCRIPT_DIR/AGENTS.md"
+DOTFILES="$SCRIPT_DIR/../bin/dotfiles"
+DRY_RUN=0
 
-# Install the shared helper commands, including llm-instance.
-"$SCRIPT_DIR/../bin/init.sh"
+for option in "$@"; do
+  case "$option" in
+    --backup) ;;
+    --dry-run) DRY_RUN=1 ;;
+    -h|--help)
+      "$DOTFILES" apply --only agents-links --help
+      exit 0
+      ;;
+    *)
+      echo "Unsupported agents init option: $option" >&2
+      exit 2
+      ;;
+  esac
+done
 
-# --- Claude Code -------------------------------------------------------------
-# Claude Code reads CLAUDE.md, not AGENTS.md; a symlink is the documented
-# interop pattern (https://code.claude.com/docs/en/memory).
-mkdir -p "$HOME/.claude"
-ln -sf "$SRC" "$HOME/.claude/CLAUDE.md"
-echo "✅ ~/.claude/CLAUDE.md -> agents/AGENTS.md"
+# Preflight and apply the native global links before touching user-owned files.
+"$DOTFILES" apply --only agents-links "$@"
 
-# --- Codex CLI ---------------------------------------------------------------
-# ~/.codex/AGENTS.md is Codex's global instructions file.
-mkdir -p "$HOME/.codex"
-ln -sf "$SRC" "$HOME/.codex/AGENTS.md"
-echo "✅ ~/.codex/AGENTS.md -> agents/AGENTS.md"
+# A dry-run ends at the transactional planner. It must never reach legacy
+# append-once behavior below.
+if [ "$DRY_RUN" -eq 1 ]; then
+  exit 0
+fi
 
 # --- Hermes ------------------------------------------------------------------
 # Hermes auto-injects cwd AGENTS.md but has no global AGENTS.md; the global
