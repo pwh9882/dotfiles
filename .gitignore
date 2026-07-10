@@ -23,3 +23,7 @@ zsh/.zshenv.local.*
 
 # Fish machine-local environment
 .config/fish/config.local.fish
+
+# Kiro CLI installer hooks (recreated by the installer where kiro-cli exists)
+.config/fish/conf.d/00_fig_pre.fish
+.config/fish/conf.d/99_fig_post.fish
