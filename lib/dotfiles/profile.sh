@@ -5,7 +5,7 @@
 
 df_profile_role_is_known() {
   case "$1" in
-    authoring-client|service-host|windows-workstation|headless-agent-worker) return 0 ;;
+    authoring-client|service-host|windows-workstation|headless-agent-worker|lab-tailnet-proxy) return 0 ;;
     *) return 1 ;;
   esac
 }
