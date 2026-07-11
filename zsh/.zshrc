@@ -242,40 +242,19 @@ export CLAUDE_CODE_TMUX_TRUECOLOR=1
 # ---- Secrets (gitignored, 기기별 민감 환경변수) ----
 [[ -f "$HOME/.zshenv.secrets" ]] && source "$HOME/.zshenv.secrets"
 
-# ---- Dotfiles auto-sync (background pull) ----
+# ---- Dotfiles update availability (background fetch, explicit pull) ----
 DOTFILES_DIR="${${(%):-%x}:A:h:h}"
-_dotfiles_auto_sync() {
-    local cache_dir="$HOME/.cache"
-    local stamp_file="$cache_dir/dotfiles-autosync.last"
-    local lock_dir="$cache_dir/dotfiles-autosync.lock"
-    local interval=21600
-    local now last
-
-    [[ -d "$DOTFILES_DIR/.git" ]] || return
-    mkdir -p "$cache_dir" 2>/dev/null || return
-
-    now="$(date +%s)"
-    if [[ -r "$stamp_file" ]]; then
-        last="$(<"$stamp_file")"
-    else
-        last=0
-    fi
-    [[ "$last" == <-> ]] || last=0
-    (( now - last >= interval )) || return
-
-    (
-        mkdir "$lock_dir" 2>/dev/null || exit 0
-        trap 'rmdir "$lock_dir" 2>/dev/null' EXIT
-
-        [[ -z "$(git -C "$DOTFILES_DIR" status --porcelain 2>/dev/null)" ]] || exit 0
-        git -C "$DOTFILES_DIR" pull --ff-only --quiet &>/dev/null && print -r -- "$now" >| "$stamp_file"
-        exit 0
-    ) &>/dev/null &!
-}
-_dotfiles_auto_sync
+[[ -r "$DOTFILES_DIR/zsh/update-check.zsh" ]] && source "$DOTFILES_DIR/zsh/update-check.zsh"
 
 # ---- Load machine-specific config ----
-[[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
+_dotfiles_zsh_local="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/zsh.local"
+if [[ -r "$_dotfiles_zsh_local" ]]; then
+    source "$_dotfiles_zsh_local"
+elif [[ -r "$HOME/.zshrc.local" ]]; then
+    # Migration fallback for machines that have not rerun zsh/init.sh yet.
+    source "$HOME/.zshrc.local"
+fi
+unset _dotfiles_zsh_local
 
 # ---- Tailscale CLI Alias (macOS only) ----
 if [[ "$OSTYPE" == "darwin"* ]]; then

@@ -2,7 +2,7 @@
 
 ## 상태
 
-Accepted, 2026-07-10.
+Accepted, 2026-07-10. 도메인 범위는 [ADR-0004](0004-minimal-operational-interface.md)에서 축소했습니다.
 
 ## 맥락
 

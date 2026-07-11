@@ -14,8 +14,8 @@ dotfiles/
 ├── init.sh                    # 전체 초기화 오케스트레이터
 ├── zsh/                       # Zsh 셸 설정
 │   ├── .zshrc                 # 공통 설정 (모든 기기 공유)
-│   ├── .zshrc.local.*         # 기기별 설정 (hostname 기반)
-│   └── init.sh                # ~/.zshrc, ~/.zshrc.local 심볼릭 링크
+│   ├── update-check.zsh       # background fetch와 업데이트 알림
+│   └── init.sh                # 공통 링크 + XDG local 파일 migration
 ├── tmux/                      # tmux 설정 (Oh My Tmux)
 │   ├── tmux.conf.local        # 커스텀 설정
 │   ├── init.sh                # tmux 설치 + Oh My Tmux 클론 + 심볼릭 링크
@@ -49,20 +49,21 @@ dotfiles/
 
 ## Multi-Machine Architecture
 
-Machine identity와 Role은 다음 경로로 해석한다.
+Machine identity는 다음 경로로 해석한다.
 
 - `llm-instance --details`가 현재 Instance 문서의 ID와 Role을 검증한다.
-- `config/machine-profiles.tsv`가 공개 Role을 Capability에 연결한다.
-- `dotfiles profile`은 hostname, username, 사설 주소, 문서 경로를 출력하지 않는다.
 - 머신 목록과 private topology는 저장소가 아니라 LLM-WIKI의 현재 Instance 문서에서 확인한다.
+- dotfiles Module 선택은 Instance와 Role에 의존하지 않는다. 기본 순서는 `bin agents-links`로 고정한다.
 
-Zsh 설정은 아직 공통/기기별 legacy overlay로 분리되어 있다:
+Shell 설정은 공통 파일과 checkout 밖의 Local Adapter로 분리한다.
 
 - `zsh/.zshrc` — 모든 기기에서 공유하는 설정
-- `zsh/.zshrc.local.<hostname>` — 기기별 공개 설정 (Conda, Homebrew 등)
-- `zsh/init.sh`가 `hostname -s` 기반으로 `~/.zshrc.local` 심볼릭 링크를 자동 생성
+- `~/.config/dotfiles/zsh.local` — 기기별 interactive Zsh 설정
+- `~/.config/dotfiles/zshenv.local` — 기기별 Zsh 환경 설정
+- `~/.config/dotfiles/bash.local` — 기기별 interactive Bash 설정
+- `~/.zshenv.secrets` — secret, 사설 endpoint, 개인 경로
 
-이 legacy overlay에는 token, 사설 주소, 개인 경로를 새로 추가하지 않는다. SSH 별칭, AWS profile, 개인 CloudStorage 경로는 gitignored `~/.zshenv.secrets`에 두고 [`docs/runbooks/configure-zsh-local-values.md`](docs/runbooks/configure-zsh-local-values.md)에 따라 설정한다. Instance 기반 local overlay로 옮기기 전까지 새 기기는 `zsh/init.sh`가 만든 최소 파일을 사용한다.
+`zsh/init.sh`와 `bash/init.sh`는 기존 `~/.zshrc.local`, `~/.zshenv.local`, `~/.bashrc.local`을 XDG Local Adapter로 한 번 복사한다. migration 전 머신에서는 공통 shell 파일이 기존 경로를 읽는다. 새 머신별 값을 tracked hostname 파일에 추가하지 않는다.
 
 ## Init System
 
@@ -73,10 +74,9 @@ Zsh 설정은 아직 공통/기기별 legacy overlay로 분리되어 있다:
 새 머신에서는 Transaction Module을 먼저 계획하고 적용한다.
 
 ```bash
-./bin/dotfiles profile          # Instance, Role, Capability, Module 검증
-./bin/dotfiles plan             # 현재 Profile의 변경을 읽기 전용으로 확인
-./bin/dotfiles apply            # 선택된 Module을 transaction으로 적용
-./bin/dotfiles doctor --profile # 적용 결과와 transaction 상태 검증
+./bin/dotfiles plan              # bin과 agents-links 변경을 읽기 전용으로 확인
+./bin/dotfiles apply             # 두 Module을 고정 순서로 적용
+./bin/dotfiles doctor --quick    # 저장소와 설정의 빠른 검사
 ```
 
 전체 legacy bootstrap은 package 설치가 필요한 경우에 명시적으로 실행한다.
@@ -121,7 +121,7 @@ bash tmux/init.sh  # tmux만 설치 (brew/apt/pacman 지원)
 - `.config/zed/prompts/` — 커스텀 프롬프트
 
 ### 주의 사항
-- `zsh/.zshrc.local.*` 파일에 민감한 값(비밀번호, 토큰)을 직접 넣지 않는다
+- tracked shell 파일에 민감한 값(비밀번호, 토큰)을 직접 넣지 않는다
 - 과거 Zed 대화에서 Docker/GitHub PAT가 노출되어 히스토리 전체 정리한 이력이 있음
 - 커밋 전 반드시 `git status` + `git diff` 확인
 - 민감 데이터가 커밋되면: `git filter-repo`로 히스토리 정리 + force push

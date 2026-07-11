@@ -2,15 +2,14 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HOSTNAME="$(hostname -s)"
-LOCAL_FILE="$SCRIPT_DIR/.bashrc.local.$HOSTNAME"
+LOCAL_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
+LOCAL_FILE="$LOCAL_CONFIG_DIR/bash.local"
 
 # shellcheck source=../lib/dotfiles/legacy_links.sh
 . "$SCRIPT_DIR/../lib/dotfiles/legacy_links.sh"
 
-# Check both HOME destinations before package installation or link writes.
+# Check the managed HOME destination before package installation or link writes.
 df_legacy_preflight_exact_link "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc"
-df_legacy_preflight_exact_link "$LOCAL_FILE" "$HOME/.bashrc.local"
 
 # ---- Install packages ----
 install_starship() {
@@ -44,23 +43,20 @@ install_starship
 install_zoxide
 install_lsd
 
-# ---- Create the machine-specific source file when missing ----
-if [[ ! -f "$LOCAL_FILE" ]]; then
-    echo "  Creating .bashrc.local.$HOSTNAME..."
-    cat > "$LOCAL_FILE" <<TMPL
-# ============================================================
-# Machine-specific config for: $HOSTNAME
-# ============================================================
-
-# ---- Linuxbrew (if installed) ----
-# if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
-#     eval "\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-# fi
-TMPL
+# ---- Create or migrate the user-owned machine-local source file ----
+mkdir -p "$LOCAL_CONFIG_DIR"
+chmod 700 "$LOCAL_CONFIG_DIR"
+umask 077
+if [[ ! -e "$LOCAL_FILE" && ! -L "$LOCAL_FILE" ]]; then
+    if [[ -r "$HOME/.bashrc.local" ]]; then
+        cp "$HOME/.bashrc.local" "$LOCAL_FILE"
+        echo "  Migrated ~/.bashrc.local -> $LOCAL_FILE"
+    else
+        printf '%s\n' '# Machine-local interactive bash configuration.' > "$LOCAL_FILE"
+        echo "  Created $LOCAL_FILE"
+    fi
+    chmod 600 "$LOCAL_FILE"
 fi
 
 # ---- Link shell configuration ----
 df_legacy_link_exact "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc" ".bashrc"
-df_legacy_link_exact \
-    "$LOCAL_FILE" "$HOME/.bashrc.local" \
-    ".bashrc.local -> .bashrc.local.$HOSTNAME"

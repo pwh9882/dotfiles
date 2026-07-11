@@ -15,4 +15,11 @@ unfunction path_prepend
 # persist chpwd_functions (e.g. Claude Code's command shell).
 export _ZO_DOCTOR=0
 
-[[ -f "$HOME/.zshenv.local" ]] && source "$HOME/.zshenv.local"
+_dotfiles_zshenv_local="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/zshenv.local"
+if [[ -r "$_dotfiles_zshenv_local" ]]; then
+    source "$_dotfiles_zshenv_local"
+elif [[ -r "$HOME/.zshenv.local" ]]; then
+    # Migration fallback for machines that have not rerun zsh/init.sh yet.
+    source "$HOME/.zshenv.local"
+fi
+unset _dotfiles_zshenv_local

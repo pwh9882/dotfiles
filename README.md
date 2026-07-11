@@ -38,6 +38,8 @@ git config rebase.autoStash true
 - 기기 간 동기화 시 uncommitted 변경사항이 있는 상태에서 pull하는 경우가 잦다
 - autoStash가 pull 전 자동 stash → pull 후 자동 unstash를 처리해준다
 
+새 셸은 6시간 간격으로 background `git fetch`를 실행한다. 새 commit이 있으면 pull 명령을 알려주며 HEAD와 worktree는 자동으로 변경하지 않는다.
+
 ## 🚀 빠른 시작
 
 ### 안전한 링크 적용 (권장)
@@ -45,14 +47,12 @@ git config rebase.autoStash true
 ```bash
 git clone https://github.com/pwh9882/dotfiles.git ~/dotfiles
 cd ~/dotfiles
-./bin/dotfiles profile
 ./bin/dotfiles plan
 ./bin/dotfiles apply
-./bin/dotfiles doctor --profile
-./bin/dotfiles tour
+./bin/dotfiles doctor --quick
 ```
 
-`profile`은 현재 Instance와 Role을 검증한다. `plan`은 선택된 Transaction Module의 변경과 충돌을 읽기 전용으로 보여준다. `apply`는 같은 계획을 transaction receipt와 rollback 정보와 함께 적용한다. 현재 이 경로는 `bin`과 `agents-links`를 관리한다.
+`plan`은 `bin`, `agents-links` Module의 변경과 충돌을 읽기 전용으로 보여준다. `apply`는 같은 계획을 transaction receipt와 rollback 정보와 함께 적용한다.
 
 ### 전체 legacy bootstrap (필요할 때 명시적으로 실행)
 
@@ -72,9 +72,9 @@ Legacy init의 파일 링크도 기존 경로를 자동으로 덮어쓰지 않�
 - **💾 세션 복원**: WezTerm workspace의 레이아웃과 프로세스를 자동 저장/복원 (패인 텍스트 제외)
 - **🎨 통일된 테마**: 전체 도구에 걸친 다크 테마 일관성
 - **⚡ 생산성 최적화**: 터미널 중심 워크플로우 + 현대적 플러그인
-- **🩺 상태 확인**: `dotfiles tour`, `dotfiles profile`, `dotfiles doctor`로 현재 기능과 머신 계약 확인
+- **🩺 상태 확인**: `dotfiles doctor --quick`으로 저장소와 설정 검사
 
-WezTerm의 상태 바, 프로젝트·SSH picker, session 복원은 [5분 온보딩](docs/runbooks/use-wezterm-workflows.md)에서 실제 키 입력 순서로 확인할 수 있다. `dotfiles tour wezterm-context-status`처럼 Feature ID를 지정하면 지원 Role, platform, 개인정보 경계, 검증 명령도 함께 나온다.
+평소 사용하는 명령과 기능은 [Dotfiles 사용 안내](docs/runbooks/daily-dotfiles.md)에 한 페이지로 정리했다. WezTerm의 상태 바, 프로젝트·SSH picker, session 복원은 [5분 온보딩](docs/runbooks/use-wezterm-workflows.md)에서 실제 키 입력 순서로 확인할 수 있다.
 
 ## 📁 디렉토리 구조
 

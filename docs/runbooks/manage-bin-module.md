@@ -179,7 +179,7 @@ bash bin/init.sh
 ## 이 절차에서 다루지 않는 작업
 
 - package 설치와 제거
-- Machine Profile 선택
+- 다른 Transaction Module 적용
 - 루트 `./init.sh` 전체 적용 방식 변경
 - 다른 Module 적용
 - 강제 덮어쓰기

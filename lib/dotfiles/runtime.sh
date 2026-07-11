@@ -6,10 +6,6 @@
 source "$DF_ROOT/lib/dotfiles/state.sh"
 source "$DF_ROOT/lib/dotfiles/modules/bin.sh"
 source "$DF_ROOT/lib/dotfiles/modules/agents_links.sh"
-source "$DF_ROOT/lib/dotfiles/profile.sh"
-source "$DF_ROOT/lib/dotfiles/features.sh"
-source "$DF_ROOT/lib/dotfiles/workspaces.sh"
-source "$DF_ROOT/lib/dotfiles/context.sh"
 
 DF_TRANSACTIONAL_MODULES="bin agents-links"
 
@@ -18,33 +14,17 @@ df_usage() {
 Usage: dotfiles <command> [options]
 
 Commands:
-  profile
-      Show the validated Instance, Role, Capability, and selected Module.
-
-  tour [FEATURE_ID]
-      List usable features or show one feature's first-run and privacy details.
-
-  context [--json]
-      Print the current read-only Execution Context snapshot.
-
   plan [--only bin|agents-links] [--backup]
-      Show desired changes. Without --only, select from the Machine Profile.
+      Show desired changes. Without --only, check both managed Modules.
 
   apply [--only bin|agents-links] [--dry-run] [--backup]
-      Apply selected changes. Without --only, select from the Machine Profile.
-      Explicit --only bypasses identity and selects one Module.
+      Apply selected changes. Without --only, apply both managed Modules.
 
   doctor [--quick|--full]
       Run read-only repository verification.
 
   doctor --only bin|agents-links
       Verify one installed Module and transaction state.
-
-  doctor --profile
-      Resolve the Machine Profile and verify all selected Modules.
-
-  doctor --only features|workspaces
-      Validate a read-only Registry and its implementation evidence.
 
   history
       List recorded Module transactions.
@@ -89,7 +69,7 @@ df_parse_module_options() {
     esac
   done
   if [ "$DF_ONLY_EXPLICIT" -eq 0 ]; then
-    df_profile_select_modules || return $?
+    DF_MODULES="$DF_TRANSACTIONAL_MODULES"
   elif ! df_module_is_known "$DF_ONLY"; then
     df_error "Module has not migrated to the transactional Installer: $DF_ONLY"
     return 2
@@ -184,13 +164,20 @@ df_apply_modules() {
   local modules="$1"
   local backup="$2"
   local module
+  local status=0
 
   # Every selected Module must pass a read-only preflight before the first
   # Transaction writes either HOME or the state directory.
   df_preflight_modules "$modules" "$backup" || return 1
+  df_writer_lock_acquire apply || return 1
   for module in $modules; do
-    df_apply_module "$module" "$backup" || return 1
+    if ! df_apply_module "$module" "$backup"; then
+      status=1
+      break
+    fi
   done
+  df_writer_lock_release || return 1
+  return "$status"
 }
 
 df_doctor_module() {
@@ -289,22 +276,33 @@ df_rollback() {
     *) df_error "transaction cannot be rolled back from status: ${status:-unknown}"; return 1 ;;
   esac
 
-  # Keep drift refusal read-only: validate every action before changing either
-  # the filesystem or the transaction status.
-  df_tx_rollback_check "$tx_dir" || return 1
   if [ "$dry_run" -eq 1 ]; then
+    # Keep dry-run read-only: validate every action without acquiring a lock.
+    df_tx_rollback_check "$tx_dir" || return 1
     df_tx_rollback_apply "$tx_dir" 1
     return $?
   fi
 
+  df_writer_lock_acquire rollback || return 1
+  # Re-check under the lock so apply and rollback cannot change the observed
+  # target state between drift validation and the first mutation.
+  df_validate_receipt_shape "$tx_dir" || { df_writer_lock_release; return 1; }
+  status="$(cat "$tx_dir/meta/status" 2>/dev/null || true)"
+  case "$status" in
+    applied|applying|rolling_back|rollback_failed) ;;
+    *) df_error "transaction cannot be rolled back from status: ${status:-unknown}"; df_writer_lock_release; return 1 ;;
+  esac
+  df_tx_rollback_check "$tx_dir" || { df_writer_lock_release; return 1; }
   df_tx_set_status "$tx_dir" "rolling_back" || return 1
   if df_tx_rollback_apply "$tx_dir" 0; then
     df_tx_set_status "$tx_dir" "rolled_back" || return 1
     df_info "DONE" "rolled back $(basename "$tx_dir")"
+    df_writer_lock_release || return 1
     return 0
   fi
   df_tx_set_status "$tx_dir" "rollback_failed" || true
   df_error "rollback failed; retry with transaction $(basename "$tx_dir") after resolving drift"
+  df_writer_lock_release || true
   return 1
 }
 
@@ -312,24 +310,6 @@ df_main() {
   local command_name="${1:-help}"
   local parse_status
   case "$command_name" in
-    profile)
-      shift
-      [ "$#" -eq 0 ] || { df_error "profile accepts no options"; return 2; }
-      df_profile_print
-      ;;
-    tour)
-      shift
-      [ "$#" -le 1 ] || { df_error "tour accepts at most one Feature ID"; return 2; }
-      if [ "$#" -eq 1 ]; then
-        df_features_detail "$1"
-      else
-        df_features_list
-      fi
-      ;;
-    context)
-      shift
-      df_context_run "$@"
-      ;;
     plan)
       shift
       df_parse_module_options "$@"; parse_status=$?
@@ -351,20 +331,14 @@ df_main() {
       ;;
     doctor)
       shift
-      if [ "${1:-}" = "--profile" ]; then
-        [ "$#" -eq 1 ] || { df_error "doctor --profile accepts no additional options"; return 2; }
-        df_profile_select_modules || return $?
-        df_doctor_modules "$DF_MODULES"
-      elif [ "${1:-}" = "--only" ]; then
+      if [ "${1:-}" = "--only" ]; then
         [ "$#" -eq 2 ] || { df_error "unexpected doctor options"; return 2; }
         case "${2:-}" in
           bin|agents-links) df_doctor_modules "$2" ;;
-          features) df_features_doctor ;;
-          workspaces) df_workspaces_doctor ;;
           *) df_error "unknown Doctor target: ${2:-missing}"; return 2 ;;
         esac
       else
-        [ "$#" -le 1 ] || { df_error "doctor accepts --quick, --full, --profile, or --only TARGET"; return 2; }
+        [ "$#" -le 1 ] || { df_error "doctor accepts --quick, --full, or --only MODULE"; return 2; }
         "$DF_ROOT/bin/dotfiles-check" "${1:---quick}"
       fi
       ;;

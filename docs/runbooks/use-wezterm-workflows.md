@@ -2,7 +2,7 @@
 
 ## 지원 범위
 
-현재 바로 사용할 수 있는 WezTerm 기능을 세 묶음으로 관리합니다.
+현재 바로 사용할 수 있는 WezTerm 기능은 세 가지입니다.
 
 | Feature | Role | Platform | 상태 |
 |---|---|---|---|
@@ -10,16 +10,7 @@
 | `wezterm-project-picker` | `authoring-client` | macOS | pilot |
 | `wezterm-session-restore` | `authoring-client` | macOS | pilot |
 
-WSL의 dotfiles는 Windows 쪽 WezTerm 설정으로 동기화됩니다. 이 경우 Feature Registry의 `wsl` platform은 Windows에서 실행되는 WezTerm UI를 뜻합니다. custom 프로젝트 picker와 session plugin은 현재 macOS에서만 활성화됩니다.
-
-등록된 기능과 개인정보 경계는 CLI에서도 확인할 수 있습니다.
-
-```console
-dotfiles tour
-dotfiles tour wezterm-context-status
-dotfiles tour wezterm-project-picker
-dotfiles tour wezterm-session-restore
-```
+WSL의 dotfiles는 Windows 쪽 WezTerm 설정으로 동기화됩니다. custom 프로젝트 picker와 session plugin은 현재 macOS에서만 활성화됩니다.
 
 ## 5분 온보딩
 
@@ -37,7 +28,7 @@ WezTerm을 열면 우측 상태 바가 다음 순서로 표시됩니다.
 - SSH pane은 감지한 원격 CWD와 host를 표시하고 탭 번호의 accent 색도 바뀝니다.
 - tmux 안에서 pane title이 바뀌어도 마지막으로 확인한 원격 host와 CWD를 메모리에서 유지합니다.
 
-상태 바는 pane title, WezTerm domain, `WEZTERM_HOST`, `WEZTERM_OS`, `WEZTERM_CWD`를 사용합니다. 이 값은 화면 표시를 위해 현재 WezTerm process 안에서만 cache합니다. `dotfiles context`의 Workspace Registry는 아직 상태 바에 연결하지 않았습니다.
+상태 바는 pane title, WezTerm domain, `WEZTERM_HOST`, `WEZTERM_OS`, `WEZTERM_CWD`를 사용합니다. 이 값은 화면 표시를 위해 현재 WezTerm process 안에서만 cache합니다.
 
 ### 2. 프로젝트와 SSH host 열기
 
@@ -90,7 +81,7 @@ layout과 실행 process metadata는 15분마다 저장하며 WezTerm 시작과 
 wezterm show-keys --lua
 lua .config/wezterm/theme_test.lua
 lua .config/wezterm/projects_test.lua
-dotfiles doctor --only features
+dotfiles doctor --quick
 ```
 
 정상 결과는 다음을 의미합니다.
@@ -98,6 +89,6 @@ dotfiles doctor --only features
 - `show-keys`가 설정 전체와 macOS plugin key binding을 로드했습니다.
 - theme logic의 로컬·SSH·tmux·WSL 판별 회귀 테스트가 통과했습니다.
 - project history 경로와 충돌 없는 workspace ID 테스트가 통과했습니다.
-- Feature Registry의 문서와 구현 evidence가 모두 존재합니다.
+- 공통 설정의 문법과 개인정보 정책 검사가 통과했습니다.
 
 상세 key binding과 원격 host 감지 우선순위는 [WezTerm 설정 문서](../../.config/wezterm/README.md)에서 확인합니다.

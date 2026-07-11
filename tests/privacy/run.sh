@@ -23,10 +23,10 @@ tracked_match() {
   git -C "$ROOT" grep -I -q -E "$pattern" -- "$@"
 }
 
-test_profiles_exclude_private_literals() {
+test_tracked_shell_files_exclude_private_literals() {
   if tracked_match \
     '[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}|/Users/[^/[:space:]]+/|vscode-remote://ssh-remote\+[[:alnum:]]|^[[:space:]]*(export[[:space:]]+)?(AWS_PROFILE|DEFAULT_USER)=' \
-    'zsh/.zshrc.local.*' '.config/starship.toml'; then
+    'zsh/*' 'bash/*' '.config/starship.toml'; then
     return 1
   fi
 }
@@ -52,6 +52,8 @@ test_local_values_have_public_onboarding() {
   grep -Fq 'DOTFILES_GOOGLE_DRIVE_DIR' "$doc" || return 1
   grep -Fq 'AWS_PROFILE' "$doc" || return 1
   grep -Fq '~/.zshenv.secrets' "$doc" || return 1
+  grep -Fq '~/.config/dotfiles/zsh.local' "$doc" || return 1
+  grep -Fq '~/.config/dotfiles/zshenv.local' "$doc" || return 1
   ! grep -Eq \
     '[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}|/Users/[^/[:space:]]+/' \
     "$doc"
@@ -88,10 +90,10 @@ test_google_drive_command_survives_oh_my_zsh_git_alias() {
 
 printf '1..4\n'
 
-if test_profiles_exclude_private_literals; then
-  pass 'tracked Zsh profiles contain no private endpoint or account literals'
+if test_tracked_shell_files_exclude_private_literals; then
+  pass 'tracked shell files contain no private endpoint or account literals'
 else
-  fail 'tracked Zsh profiles contain no private endpoint or account literals'
+  fail 'tracked shell files contain no private endpoint or account literals'
 fi
 
 if test_shared_functions_own_generic_workflows; then

@@ -262,41 +262,26 @@ check_root_init_tests() {
   /bin/bash tests/init/run.sh
 }
 
-check_machine_profile_tests() {
-  /bin/bash tests/profile/run.sh
-}
-
-check_feature_registry() {
-  DF_ROOT="$ROOT"
-  export DF_ROOT
-  # shellcheck disable=SC1091
-  . "$ROOT/lib/dotfiles/features.sh"
-  df_features_doctor
-}
-
-check_feature_registry_tests() {
-  /bin/bash tests/features/run.sh
-}
-
-check_workspace_registry() {
-  DF_ROOT="$ROOT"
-  export DF_ROOT
-  # shellcheck disable=SC1091
-  . "$ROOT/lib/dotfiles/workspaces.sh"
-  df_workspaces_validate_registry "$ROOT/config/workspaces.tsv" public 1 &&
-    df_workspaces_validate_registry "$ROOT/config/workspaces.local.example.tsv" local 0
-}
-
-check_workspace_context_tests() {
-  /bin/bash tests/workspaces/run.sh
-}
-
 check_legacy_link_tests() {
   /bin/bash tests/legacy-links/run.sh
 }
 
 check_shell_privacy_tests() {
   /bin/bash tests/privacy/run.sh
+}
+
+check_update_notifier_tests() {
+  /bin/bash tests/update-check/run.sh
+}
+
+check_shellcheck() {
+  local file
+  local failed=0
+  command -v shellcheck >/dev/null 2>&1 || return 2
+  while IFS= read -r -d '' file; do
+    shellcheck --severity=error "$file" || failed=1
+  done < <(find . -path './.git' -prune -o -type f \( -name '*.sh' -o -path './bin/*' \) -print0)
+  return "$failed"
 }
 
 run_optional_check() {
@@ -324,18 +309,15 @@ run_check "WSL npiperelay Windows-filesystem policy" check_wsl_npiperelay_policy
 run_check "WSL SSH agent stale-socket policy" check_wsl_agent_socket_policy
 run_check "Single-context domain docs" check_domain_docs
 run_check "Fail-closed legacy link policy" check_legacy_link_policy
-run_check "Feature Registry" check_feature_registry
-run_check "Workspace Registry" check_workspace_registry
 run_check "Public shell profile privacy policy" check_shell_privacy_tests
 
 if [ "$MODE" = "full" ]; then
   run_check "Transactional bin Module tests" check_transactional_bin_tests
   run_check "Transactional agents-links Module tests" check_transactional_agents_links_tests
   run_check "Root init orchestration tests" check_root_init_tests
-  run_check "Machine Profile tests" check_machine_profile_tests
-  run_check "Feature Registry tests" check_feature_registry_tests
-  run_check "Workspace Context tests" check_workspace_context_tests
   run_check "Fail-closed legacy link tests" check_legacy_link_tests
+  run_check "Dotfiles update notifier tests" check_update_notifier_tests
+  run_optional_check "ShellCheck errors" check_shellcheck
   run_optional_check "JSON syntax" check_json
   if command -v gitleaks >/dev/null 2>&1; then
     run_check "Git secret scan" gitleaks git --no-banner --redact

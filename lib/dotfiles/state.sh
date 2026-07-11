@@ -66,6 +66,77 @@ df_state_init_paths() {
   DF_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
   DF_STATE_DIR="$DF_STATE_HOME/dotfiles"
   DF_TX_ROOT="$DF_STATE_DIR/transactions"
+  DF_WRITER_LOCK_DIR="$DF_STATE_DIR/write.lock"
+}
+
+df_writer_lock_cleanup_dir() {
+  local lock_dir="$1"
+  local field
+  for field in pid command started_at; do
+    if [ -f "$lock_dir/$field" ] && [ ! -L "$lock_dir/$field" ]; then
+      command rm -f "$lock_dir/$field" || return 1
+    fi
+  done
+  rmdir "$lock_dir" 2>/dev/null
+}
+
+df_writer_lock_release() {
+  local owner_pid
+  [ "${DF_WRITER_LOCK_HELD:-0}" -eq 1 ] || return 0
+  [ -d "${DF_WRITER_LOCK_DIR:-}" ] || { DF_WRITER_LOCK_HELD=0; return 0; }
+  owner_pid="$(cat "$DF_WRITER_LOCK_DIR/pid" 2>/dev/null || true)"
+  if [ "$owner_pid" != "$$" ]; then
+    df_error "writer lock ownership changed; refusing to remove $DF_WRITER_LOCK_DIR"
+    return 1
+  fi
+  df_writer_lock_cleanup_dir "$DF_WRITER_LOCK_DIR" || return 1
+  DF_WRITER_LOCK_HELD=0
+  trap - EXIT
+}
+
+df_writer_lock_acquire() {
+  local command_name="$1"
+  local owner_pid stale_dir now
+
+  df_state_init_paths
+  umask 077
+  mkdir -p "$DF_STATE_DIR" || return 1
+  chmod 700 "$DF_STATE_DIR" || return 1
+  DF_WRITER_LOCK_HELD=0
+
+  if ! mkdir "$DF_WRITER_LOCK_DIR" 2>/dev/null; then
+    owner_pid="$(cat "$DF_WRITER_LOCK_DIR/pid" 2>/dev/null || true)"
+    if [[ "$owner_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$owner_pid" 2>/dev/null; then
+      stale_dir="$DF_STATE_DIR/write.lock.stale.$$"
+      if mv "$DF_WRITER_LOCK_DIR" "$stale_dir" 2>/dev/null; then
+        if ! mkdir "$DF_WRITER_LOCK_DIR" 2>/dev/null; then
+          df_writer_lock_cleanup_dir "$stale_dir" || true
+          df_error "another dotfiles writer acquired the lock"
+          return 1
+        fi
+        df_writer_lock_cleanup_dir "$stale_dir" || true
+      elif ! mkdir "$DF_WRITER_LOCK_DIR" 2>/dev/null; then
+        df_error "another dotfiles writer is active${owner_pid:+ (pid $owner_pid)}"
+        return 1
+      fi
+    else
+      df_error "another dotfiles writer is active${owner_pid:+ (pid $owner_pid)}"
+      return 1
+    fi
+  fi
+
+  chmod 700 "$DF_WRITER_LOCK_DIR" || return 1
+  now="$(date -u '+%Y%m%dT%H%M%SZ')"
+  df_atomic_write "$DF_WRITER_LOCK_DIR/pid" "$$" || { df_writer_lock_cleanup_dir "$DF_WRITER_LOCK_DIR"; return 1; }
+  df_atomic_write "$DF_WRITER_LOCK_DIR/command" "$command_name" || { df_writer_lock_cleanup_dir "$DF_WRITER_LOCK_DIR"; return 1; }
+  df_atomic_write "$DF_WRITER_LOCK_DIR/started_at" "$now" || { df_writer_lock_cleanup_dir "$DF_WRITER_LOCK_DIR"; return 1; }
+  DF_WRITER_LOCK_HELD=1
+  trap 'df_writer_lock_release' EXIT
+
+  # Test-only concurrency seam.
+  if [[ "${DOTFILES_TEST_WRITER_LOCK_HOLD:-}" =~ ^[1-9][0-9]*$ ]]; then
+    sleep "$DOTFILES_TEST_WRITER_LOCK_HOLD"
+  fi
 }
 
 df_tx_begin() {

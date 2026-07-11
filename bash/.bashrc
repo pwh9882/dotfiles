@@ -1,6 +1,6 @@
 # ============================================================
 # Shared bash configuration (common across all Linux machines)
-# Machine-specific settings go in .bashrc.local.<hostname>
+# Machine-specific settings go in ~/.config/dotfiles/bash.local.
 # ============================================================
 
 # If not running interactively, don't do anything
@@ -54,7 +54,14 @@ export COLORTERM=truecolor
 [[ -f "$HOME/.bashenv.secrets" ]] && source "$HOME/.bashenv.secrets"
 
 # ---- Load machine-specific config ----
-[[ -f "$HOME/.bashrc.local" ]] && source "$HOME/.bashrc.local"
+_dotfiles_bash_local="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/bash.local"
+if [[ -r "$_dotfiles_bash_local" ]]; then
+    source "$_dotfiles_bash_local"
+elif [[ -r "$HOME/.bashrc.local" ]]; then
+    # Migration fallback for machines that have not rerun bash/init.sh yet.
+    source "$HOME/.bashrc.local"
+fi
+unset _dotfiles_bash_local
 
 # ---- SSH_AUTH_SOCK for Bitwarden SSH Agent ----
 # Preserve a valid forwarded or user-provided agent. Fall back to a local

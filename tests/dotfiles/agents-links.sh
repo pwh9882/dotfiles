@@ -72,8 +72,6 @@ new_case() {
   CASE_HOME="$CASE_ROOT/home with spaces"
   CASE_TMP="$CASE_ROOT/tmp with spaces"
   CASE_STATE="$CASE_ROOT/state with spaces"
-  CASE_WIKI="$CASE_ROOT/wiki with spaces"
-  CASE_FAKE_BIN="$CASE_ROOT/fake bin"
   CASE_OUT="$CASE_ROOT/stdout"
   CASE_ERR="$CASE_ROOT/stderr"
   COMMAND_STATUS=0
@@ -81,9 +79,7 @@ new_case() {
   TX_DIR=''
   TX_ID=''
 
-  mkdir -p "$CASE_HOME" "$CASE_TMP" "$CASE_WIKI/instances" "$CASE_FAKE_BIN"
-  printf '#!/bin/sh\nprintf "test-host\\n"\n' > "$CASE_FAKE_BIN/hostname"
-  chmod 0755 "$CASE_FAKE_BIN/hostname"
+  mkdir -p "$CASE_HOME" "$CASE_TMP"
 
   [ -n "$REAL_HOME" ] || fail 'real HOME was empty before the test'
   [ "$CASE_HOME" != "$REAL_HOME" ] || fail 'temporary HOME equals real HOME'
@@ -102,11 +98,9 @@ run_program() {
   if (
     export HOME="$CASE_HOME"
     export XDG_STATE_HOME="$CASE_STATE"
-    export LLM_WIKI_DIR="$CASE_WIKI"
     export TMPDIR="$CASE_TMP"
-    export PATH="$CASE_FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin"
+    export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
     export LC_ALL=C
-    unset LLM_INSTANCE_FILE DOTFILES_PROFILE_REGISTRY
     "$program" "$@"
   ) > "$CASE_OUT" 2> "$CASE_ERR"; then
     COMMAND_STATUS=0
@@ -121,20 +115,6 @@ run_cli() {
 
 run_agents_init() {
   run_program /bin/bash "$AGENTS_INIT" "$@"
-}
-
-write_instance() {
-  local instance_id="$1"
-  local role="$2"
-  mkdir -p "$CASE_HOME/.config/llm-wiki"
-  printf '%s\n' "$instance_id" > "$CASE_HOME/.config/llm-wiki/instance-id"
-  {
-    printf '%s\n' '---'
-    printf 'instance_id: %s\n' "$instance_id"
-    printf '%s\n' 'hostname: test-host'
-    printf 'role: %s\n' "$role"
-    printf '%s\n' '---'
-  } > "$CASE_WIKI/instances/$instance_id.md"
 }
 
 assert_no_transaction_state() {
@@ -366,37 +346,24 @@ test_doctor_aggregates_all_agents_link_errors() {
   assert_no_transaction_state
 }
 
-test_profiles_select_fixed_order_and_apply_separate_receipts() {
-  local role expected
+test_default_apply_uses_fixed_order_and_separate_receipts() {
   new_case
-  for role in authoring-client service-host windows-workstation headless-agent-worker; do
-    write_instance "test-$role" "$role"
-    run_cli profile
-    assert_success
-    expected="instance_id=test-$role
-role=$role
-capability=core-tools
-capability=shared-agent-instructions
-module=bin
-module=agents-links"
-    assert_equal "$expected" "$(cat "$CASE_OUT")"
-  done
-
   run_cli apply
   assert_success
   find_transactions
-  [ "$TX_COUNT" -eq 2 ] || fail "Profile apply created $TX_COUNT transactions, expected 2"
+  [ "$TX_COUNT" -eq 2 ] || fail "default apply created $TX_COUNT transactions, expected 2"
   find_transaction_for_module bin
   find_transaction_for_module agents-links
   assert_agent_links
 
-  run_cli doctor --profile
+  run_cli doctor --only bin
+  assert_success
+  run_cli doctor --only agents-links
   assert_success
 }
 
-test_profile_preflight_stops_bin_before_agents_conflict() {
+test_default_preflight_stops_bin_before_agents_conflict() {
   new_case
-  write_instance test-preflight authoring-client
   mkdir -p "$CASE_HOME/.codex"
   printf 'user conflict\n' > "$CASE_HOME/.codex/AGENTS.md"
 
@@ -461,8 +428,8 @@ run_test 'backup rollback restores bytes, types, and modes' test_backup_and_roll
 run_test 'clean rollback removes links and empty parents' test_clean_rollback_removes_links_and_empty_parents
 run_test 'parent drift refuses rollback without partial change' test_parent_drift_refuses_rollback_without_partial_change
 run_test 'Doctor aggregates both agents link errors' test_doctor_aggregates_all_agents_link_errors
-run_test 'all Roles select fixed Modules and profile apply uses separate receipts' test_profiles_select_fixed_order_and_apply_separate_receipts
-run_test 'Profile preflight stops bin before an agents conflict' test_profile_preflight_stops_bin_before_agents_conflict
+run_test 'default apply uses fixed Modules and separate receipts' test_default_apply_uses_fixed_order_and_separate_receipts
+run_test 'default preflight stops bin before an agents conflict' test_default_preflight_stops_bin_before_agents_conflict
 run_test 'standalone dry-run and help skip legacy post-config' test_standalone_dry_run_and_help_skip_legacy_post_config
 run_test 'standalone link conflict skips legacy post-config' test_standalone_link_conflict_skips_legacy_post_config
 

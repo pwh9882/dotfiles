@@ -27,15 +27,16 @@
 ./bin/dotfiles doctor --only agents-links
 ```
 
-Machine Profile 전체를 적용할 때는 `--only`를 생략합니다.
+두 Transaction Module을 함께 적용할 때는 `--only`를 생략합니다.
 
 ```console
 ./bin/dotfiles plan
 ./bin/dotfiles apply
-./bin/dotfiles doctor --profile
+./bin/dotfiles doctor --only bin
+./bin/dotfiles doctor --only agents-links
 ```
 
-Profile apply는 `bin`, `agents-links`를 모두 preflight한 뒤 고정 순서로 적용합니다. 각 Module은 별도 Transaction ID를 출력합니다. 같은 초에 두 receipt가 생성될 수 있으므로 복구할 때는 `--last`보다 출력된 명시적 ID를 사용합니다.
+기본 apply는 `bin`, `agents-links`를 모두 preflight한 뒤 고정 순서로 적용합니다. 각 Module은 별도 Transaction ID를 출력합니다. 같은 초에 두 receipt가 생성될 수 있으므로 복구할 때는 `--last`보다 출력된 명시적 ID를 사용합니다.
 
 ## 충돌 보존
 

@@ -2,9 +2,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HOSTNAME="$(hostname -s)"
-LOCAL_FILE="$SCRIPT_DIR/.zshrc.local.$HOSTNAME"
-ZSHENV_LOCAL_FILE="$SCRIPT_DIR/.zshenv.local.$HOSTNAME"
+LOCAL_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
+LOCAL_FILE="$LOCAL_CONFIG_DIR/zsh.local"
+ZSHENV_LOCAL_FILE="$LOCAL_CONFIG_DIR/zshenv.local"
 
 # shellcheck source=../lib/dotfiles/legacy_links.sh
 . "$SCRIPT_DIR/../lib/dotfiles/legacy_links.sh"
@@ -13,9 +13,7 @@ ZSHENV_LOCAL_FILE="$SCRIPT_DIR/.zshenv.local.$HOSTNAME"
 # The legacy init is not transactional, so a conflict stops the whole link
 # phase before an earlier destination is changed.
 df_legacy_preflight_exact_link "$SCRIPT_DIR/.zshenv" "$HOME/.zshenv"
-df_legacy_preflight_exact_link "$ZSHENV_LOCAL_FILE" "$HOME/.zshenv.local"
 df_legacy_preflight_exact_link "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
-df_legacy_preflight_exact_link "$LOCAL_FILE" "$HOME/.zshrc.local"
 
 # ---- Helper: detect and activate Homebrew ----
 setup_brew() {
@@ -116,40 +114,34 @@ else
     fi
 fi
 
-# ---- Create machine-specific source files when missing ----
-if [[ ! -f "$ZSHENV_LOCAL_FILE" ]]; then
-    echo "  Creating .zshenv.local.$HOSTNAME..."
-    cat > "$ZSHENV_LOCAL_FILE" <<TMPL
-# ============================================================
-# Machine-specific zsh environment for: $HOSTNAME
-# Loaded by every zsh invocation. Keep this file minimal.
-# ============================================================
-
-TMPL
+# ---- Create or migrate user-owned machine-local source files ----
+mkdir -p "$LOCAL_CONFIG_DIR"
+chmod 700 "$LOCAL_CONFIG_DIR"
+umask 077
+if [[ ! -e "$ZSHENV_LOCAL_FILE" && ! -L "$ZSHENV_LOCAL_FILE" ]]; then
+    if [[ -r "$HOME/.zshenv.local" ]]; then
+        cp "$HOME/.zshenv.local" "$ZSHENV_LOCAL_FILE"
+        echo "  Migrated ~/.zshenv.local -> $ZSHENV_LOCAL_FILE"
+    else
+        printf '%s\n' '# Machine-local zsh environment. Keep this file minimal.' > "$ZSHENV_LOCAL_FILE"
+        echo "  Created $ZSHENV_LOCAL_FILE"
+    fi
+    chmod 600 "$ZSHENV_LOCAL_FILE"
 fi
-if [[ ! -f "$LOCAL_FILE" ]]; then
-    echo "  Creating .zshrc.local.$HOSTNAME..."
-    cat > "$LOCAL_FILE" <<TMPL
-# ============================================================
-# Machine-specific config for: $HOSTNAME
-# ============================================================
-
-# ---- Linuxbrew (if installed) ----
-# if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
-#     eval "\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-# fi
-TMPL
+if [[ ! -e "$LOCAL_FILE" && ! -L "$LOCAL_FILE" ]]; then
+    if [[ -r "$HOME/.zshrc.local" ]]; then
+        cp "$HOME/.zshrc.local" "$LOCAL_FILE"
+        echo "  Migrated ~/.zshrc.local -> $LOCAL_FILE"
+    else
+        printf '%s\n' '# Machine-local interactive zsh configuration.' > "$LOCAL_FILE"
+        echo "  Created $LOCAL_FILE"
+    fi
+    chmod 600 "$LOCAL_FILE"
 fi
 
 # ---- Link shell configuration (before chsh) ----
 df_legacy_link_exact "$SCRIPT_DIR/.zshenv" "$HOME/.zshenv" ".zshenv"
-df_legacy_link_exact \
-    "$ZSHENV_LOCAL_FILE" "$HOME/.zshenv.local" \
-    ".zshenv.local -> .zshenv.local.$HOSTNAME"
 df_legacy_link_exact "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc" ".zshrc"
-df_legacy_link_exact \
-    "$LOCAL_FILE" "$HOME/.zshrc.local" \
-    ".zshrc.local -> .zshrc.local.$HOSTNAME"
 
 # ---- Set zsh as default shell (last: chsh may prompt for password) ----
 ZSH_PATH="$(which zsh)"

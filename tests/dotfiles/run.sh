@@ -75,6 +75,17 @@ assert_output_contains() {
   esac
 }
 
+assert_error_contains() {
+  local contents
+  local needle
+  needle="$1"
+  contents="$(cat "$CASE_ERR")"
+  case "$contents" in
+    *"$needle"*) ;;
+    *) fail "stderr does not contain [$needle]" ;;
+  esac
+}
+
 new_case() {
   CASE_ROOT="$SUITE_ROOT/case-$TEST_NUMBER"
   CASE_HOME="$CASE_ROOT/home with spaces"
@@ -799,6 +810,74 @@ test_rollback_refuses_drift_without_partial_changes() {
   assert_equal "$history_before" "$history_after"
 }
 
+test_parallel_apply_is_serialized() {
+  local first_out first_err first_pid attempts
+  new_case
+  first_out="$CASE_ROOT/first-stdout"
+  first_err="$CASE_ROOT/first-stderr"
+
+  (
+    export HOME="$CASE_HOME"
+    export XDG_CONFIG_HOME="$CASE_ROOT/config with spaces"
+    export XDG_DATA_HOME="$CASE_ROOT/data with spaces"
+    export XDG_CACHE_HOME="$CASE_ROOT/cache with spaces"
+    export XDG_STATE_HOME="$CASE_XDG_STATE"
+    export TMPDIR="$CASE_TMP"
+    export LC_ALL=C
+    export DOTFILES_TEST_WRITER_LOCK_HOLD=2
+    unset LLM_WIKI_DIR
+    "$DOTFILES" apply --only bin
+  ) >"$first_out" 2>"$first_err" &
+  first_pid=$!
+
+  attempts=0
+  while [ ! -f "$CASE_DOTFILES_STATE/write.lock/pid" ]; do
+    if ! kill -0 "$first_pid" 2>/dev/null; then
+      fail "first apply exited before acquiring writer lock: $(cat "$first_err")"
+    fi
+    attempts=$((attempts + 1))
+    [ "$attempts" -lt 100 ] || fail 'timed out waiting for writer lock'
+    sleep 0.05
+  done
+
+  run_cli apply --only bin
+  assert_failure
+  assert_error_contains 'another dotfiles writer is active'
+
+  if ! wait "$first_pid"; then
+    fail "first apply failed: $(cat "$first_err")"
+  fi
+  assert_all_managed_links
+  find_transactions
+  [ "$TX_COUNT" -eq 1 ] || fail "parallel apply created $TX_COUNT transactions"
+  [ ! -e "$CASE_DOTFILES_STATE/write.lock" ] || fail 'writer lock remained after apply'
+}
+
+test_active_writer_blocks_rollback() {
+  new_case
+  run_cli apply --only bin
+  assert_success
+  assert_one_transaction
+
+  mkdir "$CASE_DOTFILES_STATE/write.lock"
+  printf '%s\n' "$$" > "$CASE_DOTFILES_STATE/write.lock/pid"
+  printf '%s\n' apply > "$CASE_DOTFILES_STATE/write.lock/command"
+  printf '%s\n' 20260711T000000Z > "$CASE_DOTFILES_STATE/write.lock/started_at"
+  chmod 700 "$CASE_DOTFILES_STATE/write.lock"
+  chmod 600 "$CASE_DOTFILES_STATE/write.lock/"*
+
+  run_cli rollback "$TX_ID"
+  assert_failure
+  assert_error_contains 'another dotfiles writer is active'
+  assert_all_managed_links
+  assert_equal applied "$(cat "$TX_DIR/meta/status")"
+
+  command rm -f "$CASE_DOTFILES_STATE/write.lock/pid" \
+    "$CASE_DOTFILES_STATE/write.lock/command" \
+    "$CASE_DOTFILES_STATE/write.lock/started_at"
+  rmdir "$CASE_DOTFILES_STATE/write.lock"
+}
+
 run_test() {
   local name
   local function_name
@@ -819,7 +898,7 @@ if [ ! -x "$DOTFILES" ]; then
   exit 1
 fi
 
-printf '1..19\n'
+printf '1..21\n'
 run_test 'plan and apply dry-run write nothing' test_plan_and_apply_dry_run_write_nothing
 run_test 'backup plan and dry-run preserve conflicts' test_backup_plan_and_dry_run_preserve_conflicts
 run_test 'apply creates exact links and secure receipt' test_apply_creates_exact_links_and_secure_receipt
@@ -839,6 +918,8 @@ run_test 'interrupted apply recovery refuses drift' test_interrupted_apply_recov
 run_test 'partial rollback retry refuses drift on a completed action' test_partial_rollback_retry_refuses_drift_on_completed_action
 run_test 'rollback --last refuses same-second ambiguity' test_rollback_last_refuses_same_second_ambiguity
 run_test 'rollback refuses drift without partial changes' test_rollback_refuses_drift_without_partial_changes
+run_test 'parallel apply is serialized by the writer lock' test_parallel_apply_is_serialized
+run_test 'an active writer blocks rollback before mutation' test_active_writer_blocks_rollback
 
 if [ "$FAILURES" -ne 0 ]; then
   printf '%d test(s) failed\n' "$FAILURES" >&2

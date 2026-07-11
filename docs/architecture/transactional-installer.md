@@ -6,7 +6,7 @@ Pilot. `bin`과 `agents-links` 두 filesystem Module을 관리합니다.
 
 ## 목표
 
-`bin` Module은 저장소의 사용자 명령을 `~/.local/bin`에 배치합니다. `agents-links` Module은 Claude Code와 Codex가 같은 전역 agent 지침을 읽도록 연결합니다. 사용자는 변경 전에 같은 Execution Plan을 확인하고, 적용 뒤에는 Transaction ID로 filesystem 변경을 되돌릴 수 있습니다.
+`bin` Module은 저장소의 사용자 명령을 `~/.local/bin`에 배치합니다. `agents-links` Module은 Claude Code와 Codex가 같은 전역 agent 지침을 읽도록 연결합니다. 사용자는 변경 전에 같은 계획을 확인하고, 적용 뒤에는 Transaction ID로 filesystem 변경을 되돌릴 수 있습니다.
 
 두 번째 Module을 추가하면서 반복되는 Module lifecycle만 공통 Interface로 추출했습니다. Implementation은 symlink와 backup을 다루며, Module 선택은 명시적 `case`와 `bin agents-links` 고정 순서를 사용합니다. 범용 manifest나 dependency graph는 두지 않습니다.
 
@@ -51,7 +51,6 @@ $HOME/.codex/AGENTS.md → <repository>/agents/AGENTS.md
 dotfiles plan [--only bin|agents-links] [--backup]
 dotfiles apply [--only bin|agents-links] [--dry-run] [--backup]
 dotfiles doctor --only bin|agents-links
-dotfiles doctor --profile
 dotfiles history
 dotfiles rollback [--last|TX_ID] [--dry-run]
 ```
@@ -60,17 +59,16 @@ dotfiles rollback [--last|TX_ID] [--dry-run]
 |---|---|
 | `plan --only MODULE` | 현재 filesystem을 읽고 한 Module의 operation을 출력합니다. |
 | `plan --only MODULE --backup` | 충돌 대상을 backup하는 계획을 출력합니다. |
-| `apply --only MODULE --dry-run` | `plan`과 같은 Execution Plan을 출력합니다. |
+| `apply --only MODULE --dry-run` | `plan`과 같은 operation을 출력합니다. |
 | `apply --only MODULE` | 충돌이 없는 operation을 적용하고 receipt를 남깁니다. |
 | `apply --only MODULE --backup` | 충돌 대상을 Transaction 내부로 옮긴 뒤 적용합니다. |
 | `doctor --only MODULE` | 한 Module의 target, receipt 권한, 미완료 Transaction을 읽기 전용으로 검사합니다. |
-| `doctor --profile` | Profile이 선택한 `bin`, `agents-links`를 모두 검사합니다. |
 | `history` | 기록된 Transaction ID와 상태를 표시합니다. |
 | `rollback --last` | `started_at`이 가장 늦고 같은 초 후보가 하나인 Transaction을 되돌립니다. |
 | `rollback TX_ID` | 지정한 receipt의 filesystem operation을 역순으로 되돌립니다. |
 | `rollback … --dry-run` | rollback 대상과 drift를 확인하고 파일을 변경하지 않습니다. |
 
-`--only`는 한 Module만 받습니다. 생략하면 Machine Profile이 `bin agents-links`를 고정 순서로 선택합니다. 명시적 `--only`는 initial bootstrap을 위해 identity 해석을 우회합니다.
+`--only`는 한 Module만 받습니다. 생략하면 `bin agents-links`를 고정 순서로 선택합니다.
 
 rollback selector는 `--last` 또는 `TX_ID` 하나만 받습니다. 둘을 함께 쓰거나 selector를 두 번 쓰면 인자 순서와 관계없이 filesystem과 receipt를 변경하기 전에 실패합니다. 가장 늦은 `started_at`에 복구 가능한 Transaction이 둘 이상이면 random ID suffix로 순서를 추측하지 않고 명시적 `TX_ID`를 요구합니다.
 
@@ -97,6 +95,7 @@ planner는 target 하나를 다음 operation 중 하나로 분류합니다.
 resolve repository와 HOME
 → 선택한 모든 Module preflight
 → conflict 정책 확인
+→ Writer Lock 획득
 → Module별 Transaction directory 생성
 → 고정 순서로 Module 적용
 → Module별 receipt 확정과 Transaction ID 출력
@@ -106,7 +105,7 @@ filesystem을 바꾸는 지점이 이 Module의 Seam입니다. symlink 생성, �
 
 `$HOME/.local/bin`이 없으면 apply가 생성합니다. rollback은 해당 Transaction이 만든 디렉터리만 추적하며, 비어 있을 때만 제거합니다.
 
-선택한 모든 Module은 첫 write 전에 preflight를 통과해야 합니다. 따라서 뒤쪽 `agents-links` 충돌이 앞쪽 `bin` 변경을 일부 남기지 않습니다. 실제 적용은 Module마다 별도 Transaction을 사용합니다. 앞 Module 적용 뒤 예상 밖의 runtime 오류로 뒤 Module이 실패하면 앞 Transaction은 확정된 상태로 남으며, 출력된 각 Transaction ID로 독립적으로 복구합니다.
+선택한 모든 Module은 첫 write 전에 preflight를 통과해야 합니다. 이후 apply 전체가 Writer Lock을 잡고 각 Module을 다시 preflight합니다. 따라서 뒤쪽 `agents-links` 충돌이 앞쪽 `bin` 변경을 일부 남기지 않고, 다른 apply나 rollback이 관찰과 mutation 사이에 끼어들지 않습니다. 실제 적용은 Module마다 별도 Transaction을 사용합니다. 앞 Module 적용 뒤 예상 밖의 runtime 오류로 뒤 Module이 실패하면 앞 Transaction은 확정된 상태로 남으며, 출력된 각 Transaction ID로 독립적으로 복구합니다.
 
 Module 계획 전체가 `noop`이면 해당 Module은 Transaction을 만들지 않습니다. operation 도중 실패하면 Implementation이 같은 receipt로 즉시 rollback을 시도합니다. 복구 성공은 `failed_rolled_back`, 복구 실패는 `rollback_failed` 상태로 기록하며, 후자는 확인할 Transaction 경로를 출력합니다.
 
@@ -173,6 +172,7 @@ rollback은 phase만 믿고 파일을 삭제하지 않습니다. 모든 action�
 | 경로 | mode |
 |---|---:|
 | `dotfiles/` state directory | `0700` |
+| `write.lock/` | `0700` |
 | `transactions/` | `0700` |
 | `<TX_ID>/` | `0700` |
 | `meta/`, `actions/`, `actions/NNNNNN/` | `0700` |
@@ -183,7 +183,15 @@ backup으로 이동한 기존 객체는 원래 type과 mode를 유지합니다. 
 
 receipt는 적용을 재현하는 manifest 역할을 하지 않습니다. 외부 명령 출력, 환경변수 값, 파일 내용, pane scrollback을 담지 않습니다.
 
-`history`는 receipt의 ID, Module, 상태를 표시합니다. 정상 적용은 `applied`, 정상 rollback은 `rolled_back` 상태로 남습니다. receipt는 rollback 이후에도 적용·복구 이력으로 유지합니다. Profile apply가 같은 초에 여러 Transaction을 만들 수 있으며, 이 경우 `rollback --last`는 변경 없이 실패하므로 `history`에 나온 명시적 ID를 사용합니다.
+`history`는 receipt의 ID, Module, 상태를 표시합니다. 정상 적용은 `applied`, 정상 rollback은 `rolled_back` 상태로 남습니다. receipt는 rollback 이후에도 적용·복구 이력으로 유지합니다. 기본 apply가 같은 초에 여러 Transaction을 만들 수 있으며, 이 경우 `rollback --last`는 변경 없이 실패하므로 `history`에 나온 명시적 ID를 사용합니다.
+
+## Writer Lock
+
+실제 `apply`와 `rollback`은 `${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/write.lock/`을 공유합니다. atomic `mkdir`에 성공한 한 process만 filesystem을 변경합니다. lock에는 PID, 명령, 시작 시각을 `0600` regular file로 기록합니다.
+
+process가 정상 종료하면 EXIT trap과 명시적 release가 lock을 제거합니다. SIGKILL 뒤 lock이 남고 기록한 PID가 더 이상 존재하지 않으면 다음 writer가 stale directory를 옮긴 뒤 lock 획득을 한 번 재시도합니다. PID가 살아 있거나 소유자를 확인할 수 없으면 안전하게 중단합니다.
+
+`plan`, `doctor`, `history`, `apply --dry-run`, `rollback --dry-run`은 lock을 만들지 않습니다.
 
 ## Rollback 경계
 

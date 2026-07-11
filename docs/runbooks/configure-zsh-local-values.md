@@ -1,6 +1,8 @@
 # Zsh local 값 설정
 
-tracked `zsh/.zshrc.local.<hostname>` 파일에는 Conda, Homebrew, Flutter처럼 공개해도 되는 도구 초기화만 두고 있습니다. SSH 별칭, 원격 경로, AWS profile, 개인 CloudStorage 경로는 기기의 `~/.zshenv.secrets`에 둡니다. 이 파일은 `zsh/.zshrc`가 있을 때만 불러오며 `*.secrets` 규칙으로 Git에서 제외됩니다.
+Conda, Homebrew, Flutter처럼 머신마다 다른 도구 초기화는 `~/.config/dotfiles/zsh.local`에 둡니다. 모든 zsh 실행에 필요한 최소 환경은 `~/.config/dotfiles/zshenv.local`에 둡니다. SSH 별칭, 원격 경로, AWS profile, 개인 CloudStorage 경로는 `~/.zshenv.secrets`에 둡니다.
+
+`zsh/init.sh`를 실행하면 기존 `~/.zshrc.local`과 `~/.zshenv.local` 내용을 새 XDG 경로로 복사합니다. 기존 파일은 migration 확인을 위해 그대로 둡니다.
 
 ## 최초 1회 설정
 
@@ -17,7 +19,7 @@ export AWS_PROFILE='default-profile'
 ```
 
 ```bash
-chmod 600 ~/.zshenv.secrets
+chmod 600 ~/.zshenv.secrets ~/.config/dotfiles/zsh.local ~/.config/dotfiles/zshenv.local
 exec zsh
 ```
 
@@ -54,8 +56,8 @@ gd
 ## 검증
 
 ```bash
-zsh -n zsh/.zshrc zsh/.zshrc.local.*
+zsh -n zsh/.zshrc zsh/.zshenv zsh/update-check.zsh
 bash tests/privacy/run.sh
 ```
 
-검사는 tracked Zsh profile에 email 형식의 경로, macOS 사용자 절대 경로, literal 원격 endpoint, `AWS_PROFILE`/`DEFAULT_USER` 대입이 다시 들어오는지 확인합니다.
+검사는 tracked shell 파일에 email 형식의 경로, macOS 사용자 절대 경로, literal 원격 endpoint, `AWS_PROFILE`/`DEFAULT_USER` 대입이 다시 들어오는지 확인합니다.

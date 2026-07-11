@@ -59,6 +59,10 @@ assert_symlink() {
   }
 }
 
+assert_regular_file() {
+  [[ -f "$1" && ! -L "$1" ]] || fail "not a regular file: $1"
+}
+
 assert_error_contains() {
   case "$(cat "$CASE_ERR")" in
     *"$1"*) ;;
@@ -183,9 +187,11 @@ test_zsh_absent_and_expected_links_are_idempotent() {
   run_init zsh linux-gnu
   assert_success
   assert_symlink "$CASE_HOME/.zshenv" "$CASE_REPO/zsh/.zshenv"
-  assert_symlink "$CASE_HOME/.zshenv.local" "$CASE_REPO/zsh/.zshenv.local.fixture"
   assert_symlink "$CASE_HOME/.zshrc" "$CASE_REPO/zsh/.zshrc"
-  assert_symlink "$CASE_HOME/.zshrc.local" "$CASE_REPO/zsh/.zshrc.local.fixture"
+  assert_regular_file "$CASE_CONFIG/dotfiles/zshenv.local"
+  assert_regular_file "$CASE_CONFIG/dotfiles/zsh.local"
+  assert_absent "$CASE_HOME/.zshenv.local"
+  assert_absent "$CASE_HOME/.zshrc.local"
 
   run_init zsh linux-gnu
   assert_success
@@ -202,8 +208,7 @@ test_zsh_regular_conflict_stops_before_any_link_or_source_write() {
   assert_absent "$CASE_HOME/.zshenv"
   assert_absent "$CASE_HOME/.zshenv.local"
   assert_absent "$CASE_HOME/.zshrc.local"
-  assert_absent "$CASE_REPO/zsh/.zshenv.local.fixture"
-  assert_absent "$CASE_REPO/zsh/.zshrc.local.fixture"
+  assert_absent "$CASE_CONFIG/dotfiles"
 }
 
 test_bash_absent_and_expected_links_are_idempotent() {
@@ -211,14 +216,15 @@ test_bash_absent_and_expected_links_are_idempotent() {
   run_init bash linux-gnu
   assert_success
   assert_symlink "$CASE_HOME/.bashrc" "$CASE_REPO/bash/.bashrc"
-  assert_symlink "$CASE_HOME/.bashrc.local" "$CASE_REPO/bash/.bashrc.local.fixture"
+  assert_regular_file "$CASE_CONFIG/dotfiles/bash.local"
+  assert_absent "$CASE_HOME/.bashrc.local"
 
   run_init bash linux-gnu
   assert_success
-  assert_symlink "$CASE_HOME/.bashrc.local" "$CASE_REPO/bash/.bashrc.local.fixture"
+  assert_regular_file "$CASE_CONFIG/dotfiles/bash.local"
 }
 
-test_bash_other_symlink_conflict_stops_before_first_link() {
+test_bash_legacy_local_is_migrated_without_replacing_it() {
   local other
   new_case
   other="$CASE_HOME/other bashrc"
@@ -226,11 +232,11 @@ test_bash_other_symlink_conflict_stops_before_first_link() {
   ln -s "$other" "$CASE_HOME/.bashrc.local"
 
   run_init bash linux-gnu
-  assert_failure
-  assert_absent "$CASE_HOME/.bashrc"
+  assert_success
+  assert_symlink "$CASE_HOME/.bashrc" "$CASE_REPO/bash/.bashrc"
   assert_symlink "$CASE_HOME/.bashrc.local" "$other"
   assert_file_line 'private target' "$other"
-  assert_absent "$CASE_REPO/bash/.bashrc.local.fixture"
+  assert_file_line 'private target' "$CASE_CONFIG/dotfiles/bash.local"
 }
 
 test_config_default_links_are_exact_and_idempotent() {
@@ -372,7 +378,7 @@ printf '1..12\n'
 run_test 'Zsh creates exact links and repeats as a no-op' test_zsh_absent_and_expected_links_are_idempotent
 run_test 'Zsh regular conflict stops before any link or source write' test_zsh_regular_conflict_stops_before_any_link_or_source_write
 run_test 'Bash creates exact links and repeats as a no-op' test_bash_absent_and_expected_links_are_idempotent
-run_test 'Bash other-link conflict stops before the first link' test_bash_other_symlink_conflict_stops_before_first_link
+run_test 'Bash legacy local is migrated without replacing it' test_bash_legacy_local_is_migrated_without_replacing_it
 run_test '.config default links are exact and idempotent' test_config_default_links_are_exact_and_idempotent
 run_test 'private Zed settings stop all config writes and remain intact' test_zed_private_settings_are_preserved_before_other_config_writes
 run_test 'default Starship conflict stops all config writes and remains intact' test_default_starship_conflict_is_preserved_before_other_config_writes
