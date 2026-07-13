@@ -261,42 +261,8 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 fi
 
-# ---- SSH_AUTH_SOCK for Bitwarden SSH Agent ----
-# Preserve a valid forwarded or user-provided agent. Fall back to a local
-# Bitwarden socket only when the current socket is absent or stale.
-if [[ -z "${SSH_AUTH_SOCK:-}" || ! -S "$SSH_AUTH_SOCK" ]]; then
-    if grep -qi microsoft /proc/version 2>/dev/null; then
-        # WSL2: Windows Bitwarden Desktop → npiperelay + socat bridge
-        _dotfiles_agent_sock="$HOME/.ssh/agent.sock"
-        _dotfiles_agent_live=0
-        if [[ -S "$_dotfiles_agent_sock" ]]; then
-            if command -v ss &>/dev/null; then
-                ss -xl 2>/dev/null | grep -F -- "$_dotfiles_agent_sock" >/dev/null && _dotfiles_agent_live=1
-            else
-                _dotfiles_agent_live=1
-            fi
-        fi
-        if (( ! _dotfiles_agent_live )); then
-            rm -f "$_dotfiles_agent_sock"
-            mkdir -p "$HOME/.ssh"
-            setsid socat \
-                UNIX-LISTEN:"$_dotfiles_agent_sock",fork \
-                EXEC:"npiperelay.exe -ei -s //./pipe/openssh-ssh-agent",nofork &>/dev/null &
-        fi
-        export SSH_AUTH_SOCK="$_dotfiles_agent_sock"
-    else
-        for _dotfiles_agent_sock in \
-            "$HOME/.bitwarden-ssh-agent.sock" \
-            "$HOME/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock"
-        do
-            if [[ -S "$_dotfiles_agent_sock" ]]; then
-                export SSH_AUTH_SOCK="$_dotfiles_agent_sock"
-                break
-            fi
-        done
-    fi
-fi
-unset _dotfiles_agent_sock _dotfiles_agent_live
+# ---- SSH agent selection ----
+[[ -r "$DOTFILES_DIR/zsh/ssh-agent.zsh" ]] && source "$DOTFILES_DIR/zsh/ssh-agent.zsh"
 
 # zoxide replaces cd with its smart jump; j is an alias for the same thing.
 command -v zoxide &>/dev/null && eval "$(zoxide init zsh --cmd cd)"

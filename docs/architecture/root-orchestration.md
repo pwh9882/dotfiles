@@ -42,7 +42,7 @@ Module 목록 검증은 첫 변경 전에 끝납니다. 실행 단계의 fail-fa
 
 ## Transaction 경계
 
-현재 `bin/init.sh`와 `agents/init.sh`의 Claude/Codex link 단계는 Transactional Installer에 위임하고 plan, receipt, drift 검증, rollback을 지원합니다. Hermes/OpenClaw 후처리와 나머지 Module은 기존 installer 방식으로 동작합니다. Zsh, Bash, Claude statusline, tmux, `.config`의 legacy link는 공통 exact-link preflight를 사용해 기존 경로를 덮어쓰지 않습니다. Starship override와 Claude settings 생성은 임시 파일을 거쳐 교체합니다. package 설치, `chsh`, 외부 repository clone, legacy post-config는 루트 단위 rollback 대상에 포함되지 않습니다.
+현재 `bin/init.sh`와 `agents/init.sh`의 Claude/Codex link 단계는 Transactional Installer에 위임하고 plan, receipt, drift 검증, rollback을 지원합니다. Hermes/OpenClaw 후처리와 나머지 Module은 기존 installer 방식으로 동작합니다. Zsh와 Bash는 package 작업 전에 Local Adapter를 검사합니다. Zsh, Bash, Claude statusline, tmux, `.config`의 legacy link는 공통 exact-link preflight를 사용해 기존 경로를 덮어쓰지 않습니다. Starship override와 Claude settings 생성은 임시 파일을 거쳐 교체합니다. package 설치, `chsh`, 외부 repository clone, legacy post-config는 루트 단위 rollback 대상에 포함되지 않습니다.
 
 따라서 `./init.sh` 성공을 하나의 원자적 Transaction으로 해석하지 않습니다. `bin`과 `agents-links`는 출력된 각 Transaction ID로 복구하고, 다른 변경은 출력과 현재 상태를 확인해 개별적으로 복구합니다. 운영 절차는 [`bin` runbook](../runbooks/manage-bin-module.md)과 [`agents-links` runbook](../runbooks/manage-agents-links.md)에 기록합니다.
 

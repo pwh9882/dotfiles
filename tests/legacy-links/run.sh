@@ -118,6 +118,7 @@ new_case() {
   cp "$ROOT/claude/statusline-command.sh" "$CASE_REPO/claude/statusline-command.sh"
   cp "$ROOT/.config/init.sh" "$CASE_REPO/.config/init.sh"
   cp "$ROOT/lib/dotfiles/legacy_links.sh" "$CASE_REPO/lib/dotfiles/legacy_links.sh"
+  cp "$ROOT/lib/dotfiles/local_adapter.sh" "$CASE_REPO/lib/dotfiles/local_adapter.sh"
 
   for dir in wezterm nvim fish neofetch ghostty; do
     mkdir -p "$CASE_REPO/.config/$dir"
@@ -237,6 +238,39 @@ test_bash_legacy_local_is_migrated_without_replacing_it() {
   assert_symlink "$CASE_HOME/.bashrc.local" "$other"
   assert_file_line 'private target' "$other"
   assert_file_line 'private target' "$CASE_CONFIG/dotfiles/bash.local"
+}
+
+test_zsh_invalid_local_adapter_stops_before_shared_links() {
+  new_case
+  mkdir -p "$CASE_CONFIG/dotfiles/zsh.local"
+
+  run_init zsh linux-gnu
+  assert_failure
+  assert_error_contains 'Local Adapter must be a readable regular file'
+  assert_absent "$CASE_HOME/.zshenv"
+  assert_absent "$CASE_HOME/.zshrc"
+}
+
+test_bash_broken_local_adapter_symlink_stops_before_shared_link() {
+  new_case
+  mkdir -p "$CASE_CONFIG/dotfiles"
+  ln -s "$CASE_ROOT/missing-local-file" "$CASE_CONFIG/dotfiles/bash.local"
+
+  run_init bash linux-gnu
+  assert_failure
+  assert_error_contains 'Local Adapter symlink must resolve to a readable regular file'
+  assert_absent "$CASE_HOME/.bashrc"
+}
+
+test_zsh_invalid_xdg_config_parent_stops_before_shared_links() {
+  new_case
+  printf 'not a directory\n' > "$CASE_CONFIG"
+
+  run_init zsh linux-gnu
+  assert_failure
+  assert_error_contains 'Local Adapter directory is invalid'
+  assert_absent "$CASE_HOME/.zshenv"
+  assert_absent "$CASE_HOME/.zshrc"
 }
 
 test_config_default_links_are_exact_and_idempotent() {
@@ -374,11 +408,14 @@ run_test() {
   fi
 }
 
-printf '1..12\n'
+printf '1..15\n'
 run_test 'Zsh creates exact links and repeats as a no-op' test_zsh_absent_and_expected_links_are_idempotent
 run_test 'Zsh regular conflict stops before any link or source write' test_zsh_regular_conflict_stops_before_any_link_or_source_write
 run_test 'Bash creates exact links and repeats as a no-op' test_bash_absent_and_expected_links_are_idempotent
 run_test 'Bash legacy local is migrated without replacing it' test_bash_legacy_local_is_migrated_without_replacing_it
+run_test 'Zsh invalid Local Adapter stops before shared links' test_zsh_invalid_local_adapter_stops_before_shared_links
+run_test 'Bash broken Local Adapter symlink stops before shared link' test_bash_broken_local_adapter_symlink_stops_before_shared_link
+run_test 'Zsh invalid XDG config parent stops before shared links' test_zsh_invalid_xdg_config_parent_stops_before_shared_links
 run_test '.config default links are exact and idempotent' test_config_default_links_are_exact_and_idempotent
 run_test 'private Zed settings stop all config writes and remain intact' test_zed_private_settings_are_preserved_before_other_config_writes
 run_test 'default Starship conflict stops all config writes and remains intact' test_default_starship_conflict_is_preserved_before_other_config_writes

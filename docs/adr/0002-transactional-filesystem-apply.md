@@ -57,3 +57,5 @@ package, shell, service는 rollback 경계가 서로 다릅니다. `bin`의 file
 두 번째 filesystem Module로 `agents-links`를 추가했습니다. Claude/Codex global instruction link는 같은 Transaction primitive를 사용하며, Profile 적용은 `bin agents-links` 전체를 write 전에 preflight합니다. 반복이 실제로 확인된 Module dispatch와 lifecycle만 공통화했고, manifest DSL과 dependency graph는 추가하지 않았습니다. Hermes/OpenClaw의 사용자 소유 파일 후처리는 receipt 밖에 유지합니다.
 
 프로세스 중단 복구를 추가하면서 directory와 link primitive에 write-ahead phase를 적용했습니다. 별도 journal framework나 apply 재개 기능은 추가하지 않았습니다. 복구 명령은 항상 원래 filesystem 상태로 rollback하며, 기존 `prepared`, `backup_moved`, `applied` receipt도 관찰 기반 preflight로 처리합니다.
+
+Writer Lock 적용 뒤에도 같은 process에서 생성한 receipt ID가 충돌하면 `mkdir -p`가 기존 directory를 재사용할 수 있었습니다. Transaction root를 `mktemp -d`로 원자적으로 생성하고 새 receipt에 `schema_version=1`을 기록했습니다. schema field가 없는 기존 receipt는 legacy v1로 계속 읽습니다.

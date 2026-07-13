@@ -289,6 +289,7 @@ assert_secure_transaction_state() {
 
   metadata_files="$(find "$TX_DIR" -path "$TX_DIR/backup" -prune -o -type f -print)"
   [ -n "$metadata_files" ] || fail 'transaction contains no regular metadata files'
+  assert_equal 1 "$(cat "$TX_DIR/meta/schema_version")"
 }
 
 make_conflicts() {
@@ -676,11 +677,33 @@ test_doctor_rejects_malformed_transaction_receipts() {
   printf '%s\n' "$original_module" >"$TX_DIR/meta/module"
   chmod 0600 "$TX_DIR/meta/module"
 
+  printf '2\n' >"$TX_DIR/meta/schema_version"
+  run_cli doctor --only bin
+  assert_failure
+  printf '1\n' >"$TX_DIR/meta/schema_version"
+
   mkdir "$TX_DIR/actions/not-an-action"
   chmod 0700 "$TX_DIR/actions/not-an-action"
   run_cli doctor --only bin
   assert_failure
   assert_all_managed_links
+}
+
+test_legacy_receipt_without_schema_remains_usable() {
+  local applied_tx_id
+  new_case
+
+  run_cli apply --only bin
+  assert_success
+  assert_one_transaction
+  applied_tx_id="$TX_ID"
+  /bin/rm "$TX_DIR/meta/schema_version"
+
+  run_cli doctor --only bin
+  assert_success
+  run_cli rollback "$applied_tx_id"
+  assert_success
+  assert_no_managed_entries
 }
 
 test_interrupted_apply_recovery_refuses_drift() {
@@ -898,7 +921,7 @@ if [ ! -x "$DOTFILES" ]; then
   exit 1
 fi
 
-printf '1..21\n'
+printf '1..22\n'
 run_test 'plan and apply dry-run write nothing' test_plan_and_apply_dry_run_write_nothing
 run_test 'backup plan and dry-run preserve conflicts' test_backup_plan_and_dry_run_preserve_conflicts
 run_test 'apply creates exact links and secure receipt' test_apply_creates_exact_links_and_secure_receipt
@@ -914,6 +937,7 @@ run_test 'rollback recovers an apply interrupted after target creation' test_rec
 run_test 'rollback retries a partially completed rollback' test_retry_partial_rollback_from_rollback_failed
 run_test 'doctor enforces the transaction status allowlist' test_doctor_enforces_transaction_status_allowlist
 run_test 'doctor rejects malformed transaction receipts' test_doctor_rejects_malformed_transaction_receipts
+run_test 'legacy receipts without schema remain usable' test_legacy_receipt_without_schema_remains_usable
 run_test 'interrupted apply recovery refuses drift' test_interrupted_apply_recovery_refuses_drift
 run_test 'partial rollback retry refuses drift on a completed action' test_partial_rollback_retry_refuses_drift_on_completed_action
 run_test 'rollback --last refuses same-second ambiguity' test_rollback_last_refuses_same_second_ambiguity

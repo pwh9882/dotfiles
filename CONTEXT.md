@@ -49,10 +49,11 @@ WezTerm config      ──> machine/local.lua
 4. Transaction Module은 공통 filesystem primitive를 통해서만 관리 대상 파일을 변경합니다.
 5. 기존 파일·디렉터리·다른 symlink 충돌은 기본적으로 중단합니다. `--backup`을 명시한 경우에만 Transaction 안으로 이동합니다.
 6. 실제 `apply`와 `rollback`은 같은 Writer Lock을 사용합니다.
-7. shell 시작 시 background `git fetch`로 업데이트 존재 여부만 확인합니다. HEAD와 worktree는 사용자가 `git pull --ff-only`를 실행할 때만 바뀝니다.
-8. runtime state는 XDG state/cache directory에 두고 Git checkout에 쓰지 않습니다.
-9. secret 값과 pane scrollback은 Transaction, runlog, LLM-WIKI에 기록하지 않습니다.
-10. 머신별 shell 설정은 checkout 밖의 Local Adapter에 둡니다. 기존 hostname별 파일은 migration 기간에만 읽습니다.
+7. 새 Transaction directory는 원자적으로 생성하고 schema version을 기록합니다. version이 없는 기존 receipt는 legacy v1로 읽습니다.
+8. Zsh 시작 시 background `git fetch`로 업데이트 존재 여부만 확인합니다. HEAD와 worktree는 사용자가 `git pull --ff-only`를 실행할 때만 바뀝니다.
+9. runtime state는 XDG state/cache directory에 두고 Git checkout에 쓰지 않습니다.
+10. secret 값과 pane scrollback은 Transaction, runlog, LLM-WIKI에 기록하지 않습니다.
+11. 머신별 shell 설정은 checkout 밖의 Local Adapter에 둡니다. Installer는 package 작업 전에 Adapter type과 접근 권한을 검사합니다.
 
 ## Main Flows
 
@@ -66,7 +67,7 @@ fixed Module selection → 전체 preflight → Writer Lock
 ### Update discovery
 
 ```text
-shell start → fetched ref에서 ahead 확인 → 사용자에게 알림
+Zsh start → fetched ref에서 ahead 확인 → 사용자에게 알림
 → background fetch → 사용자가 git pull --ff-only 실행
 ```
 

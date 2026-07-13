@@ -71,7 +71,7 @@ check_zsh_syntax() {
   command -v zsh >/dev/null 2>&1 || return 2
   while IFS= read -r file; do
     case "$file" in
-      zsh/.zsh*) zsh -n "$file" || failed=1 ;;
+      zsh/.zsh*|zsh/*.zsh) zsh -n "$file" || failed=1 ;;
     esac
   done < <(git ls-files --cached --others --exclude-standard -- 'zsh/*')
   return "$failed"
@@ -221,9 +221,9 @@ check_wsl_npiperelay_policy() {
 }
 
 check_wsl_agent_socket_policy() {
-  grep -Fq 'ss -xl' zsh/.zshrc || return 1
+  grep -Fq 'ss -xl' zsh/ssh-agent.zsh || return 1
   grep -Fq 'ss -xl' bash/.bashrc || return 1
-  grep -Fq '_dotfiles_agent_live' zsh/.zshrc || return 1
+  grep -Fq 'agent_live' zsh/ssh-agent.zsh || return 1
   grep -Fq '_dotfiles_agent_live' bash/.bashrc
 }
 
@@ -237,9 +237,12 @@ check_domain_docs() {
 check_legacy_link_policy() {
   local file
   [ -f lib/dotfiles/legacy_links.sh ] || return 1
+  [ -f lib/dotfiles/local_adapter.sh ] || return 1
   for file in zsh/init.sh bash/init.sh .config/init.sh tmux/init.sh claude/init.sh; do
     grep -Fq 'lib/dotfiles/legacy_links.sh' "$file" || return 1
   done
+  grep -Fq 'lib/dotfiles/local_adapter.sh' zsh/init.sh || return 1
+  grep -Fq 'lib/dotfiles/local_adapter.sh' bash/init.sh || return 1
   ! grep -Eq 'ln[[:space:]]+-[^[:space:]]*f' \
     zsh/init.sh bash/init.sh .config/init.sh tmux/init.sh claude/init.sh || return 1
   ! grep -Eq 'rm[[:space:]]+-[^[:space:]]*f.*(starship\.toml|settings\.json)' \
@@ -272,6 +275,10 @@ check_shell_privacy_tests() {
 
 check_update_notifier_tests() {
   /bin/bash tests/update-check/run.sh
+}
+
+check_ssh_agent_tests() {
+  zsh tests/ssh-agent/run.zsh
 }
 
 check_shellcheck() {
@@ -317,6 +324,7 @@ if [ "$MODE" = "full" ]; then
   run_check "Root init orchestration tests" check_root_init_tests
   run_check "Fail-closed legacy link tests" check_legacy_link_tests
   run_check "Dotfiles update notifier tests" check_update_notifier_tests
+  run_check "SSH agent selection tests" check_ssh_agent_tests
   run_optional_check "ShellCheck errors" check_shellcheck
   run_optional_check "JSON syntax" check_json
   if command -v gitleaks >/dev/null 2>&1; then

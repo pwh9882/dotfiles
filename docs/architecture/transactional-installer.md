@@ -118,6 +118,7 @@ Module 계획 전체가 `noop`이면 해당 Module은 Transaction을 만들지 �
 ```text
 ${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/transactions/<TX_ID>/
 ├── meta/
+│   ├── schema_version
 │   └── *
 ├── actions/
 │   ├── 000001/
@@ -127,7 +128,9 @@ ${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/transactions/<TX_ID>/
 └── backup/
 ```
 
-Transaction directory 전체가 receipt 원본입니다. `meta/`는 Transaction ID와 Module 같은 공통 metadata를, `actions/NNNNNN/`은 적용 순서별 target·source·operation·backup 상대 경로·진행 phase를 보관합니다. `backup/`은 충돌 대상을 보관합니다. rollback은 operation, source, phase를 조합해 예상 상태를 판정합니다.
+Transaction directory 전체가 receipt 원본입니다. root는 `mktemp -d`로 원자적으로 생성해 기존 receipt를 재사용하지 않습니다. `meta/`는 schema version, Transaction ID와 Module 같은 공통 metadata를, `actions/NNNNNN/`은 적용 순서별 target·source·operation·backup 상대 경로·진행 phase를 보관합니다. `backup/`은 충돌 대상을 보관합니다. rollback은 operation, source, phase를 조합해 예상 상태를 판정합니다.
+
+새 receipt는 `meta/schema_version=1`을 기록합니다. 이 field가 없는 기존 receipt는 legacy v1로 읽어 기존 Doctor와 rollback을 유지합니다. field가 있으면 readable regular file과 값 `1`을 요구하며 다른 version은 첫 mutation 전에 거부합니다.
 
 ### 상태
 
@@ -140,7 +143,7 @@ Transaction directory 전체가 receipt 원본입니다. `meta/`는 Transaction 
 | `failed_rolled_back` | apply 오류 뒤 자동 rollback이 완료됐습니다. | 통과 |
 | `rollback_failed` | rollback을 완료하지 못했습니다. | 실패 |
 
-Doctor는 위 완료 상태 세 개만 정상 receipt로 인정합니다. 알 수 없는 상태, 필수 metadata 누락, 잘못된 action directory 이름, 알 수 없는 operation·phase·`before_type`, 안전하지 않은 backup 상대 경로도 실패합니다. 검사는 receipt를 수정하지 않습니다.
+Doctor는 위 완료 상태 세 개만 정상 receipt로 인정합니다. 지원하지 않는 schema version, 알 수 없는 상태, 필수 metadata 누락, 잘못된 action directory 이름, 알 수 없는 operation·phase·`before_type`, 안전하지 않은 backup 상대 경로도 실패합니다. 검사는 receipt를 수정하지 않습니다.
 
 ### Write-ahead action phase
 

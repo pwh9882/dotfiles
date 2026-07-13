@@ -45,16 +45,28 @@ printf 'two\n' >> "$seed/value"
 git -C "$seed" commit -qam update
 git -C "$seed" push -q origin HEAD || fail 'could not push update'
 
+# A killed fetch can leave this cache lock behind. Make it old enough to be
+# reclaimed and verify that the first check still refreshes remote refs.
+mkdir -p "$cache/dotfiles/update-check.lock"
+printf 'abandoned\n' > "$cache/dotfiles/update-check.lock/token"
+
 run_check() {
   DOTFILES_DIR="$checkout" \
   XDG_CACHE_HOME="$cache" \
-  DOTFILES_UPDATE_CHECK_INTERVAL=0 \
-  DOTFILES_UPDATE_CHECK_FOREGROUND=1 \
+  DOTFILES_TEST_UPDATE_CHECK_INTERVAL=0 \
+  DOTFILES_TEST_UPDATE_CHECK_FOREGROUND=1 \
     zsh "$ROOT/zsh/update-check.zsh"
 }
 
-first_output="$(run_check)" || fail 'first update check failed'
-[ -z "$first_output" ] || fail 'first check announced before fetch completed'
+locked_output="$(run_check)" || fail 'fresh-lock update check failed'
+[ -z "$locked_output" ] || fail 'fresh lock check produced an update notice'
+[ -d "$cache/dotfiles/update-check.lock" ] || fail 'fresh update lock was removed'
+[ "$(git -C "$checkout" rev-list --count HEAD..origin/HEAD)" = 0 ] || fail 'fresh lock did not suppress fetch'
+
+touch -t 202001010000 "$cache/dotfiles/update-check.lock"
+first_output="$(run_check)" || fail 'stale-lock update check failed'
+[ -z "$first_output" ] || fail 'stale-lock check announced before fetch completed'
+[ ! -e "$cache/dotfiles/update-check.lock" ] || fail 'stale update lock was not reclaimed'
 [ "$(git -C "$checkout" rev-parse HEAD)" = "$before_head" ] || fail 'fetch changed HEAD'
 [ "$(cat "$checkout/value")" = 'one' ] || fail 'fetch changed the worktree'
 

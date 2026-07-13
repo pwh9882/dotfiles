@@ -7,9 +7,14 @@ LOCAL_FILE="$LOCAL_CONFIG_DIR/bash.local"
 
 # shellcheck source=../lib/dotfiles/legacy_links.sh
 . "$SCRIPT_DIR/../lib/dotfiles/legacy_links.sh"
+# shellcheck source=../lib/dotfiles/local_adapter.sh
+. "$SCRIPT_DIR/../lib/dotfiles/local_adapter.sh"
 
 # Check the managed HOME destination before package installation or link writes.
 df_legacy_preflight_exact_link "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc"
+df_local_adapter_preflight_dir "${LOCAL_CONFIG_DIR%/*}"
+df_local_adapter_preflight_dir "$LOCAL_CONFIG_DIR"
+df_local_adapter_preflight_file "$LOCAL_FILE"
 
 # ---- Install packages ----
 install_starship() {

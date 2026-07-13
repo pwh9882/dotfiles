@@ -43,6 +43,9 @@ jobs:
       - name: Run quick checks
         run: ./bin/dotfiles-check --quick
 
+      - name: Run macOS Zsh update regression
+        run: /bin/bash tests/update-check/run.sh
+
       - name: Run Bash 3.2 filesystem regressions
         run: |
           /bin/bash tests/dotfiles/run.sh

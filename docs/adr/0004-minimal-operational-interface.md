@@ -16,7 +16,7 @@ Machine Profile에는 다섯 Role이 있었지만 모두 `bin`, `agents-links`�
 - Instance와 Role은 에이전트·인프라 identity에 사용하며 dotfiles Module 선택에는 사용하지 않습니다.
 - Feature Registry와 `dotfiles tour`를 제거하고 한 페이지짜리 사용 안내를 원본으로 둡니다.
 - 단일 Workspace Registry와 `dotfiles context`를 제거합니다. 필요 정보는 `llm-instance`, `pwd`, Git 명령으로 확인합니다.
-- shell 시작 시 자동 `pull`을 실행하지 않습니다. background `fetch`와 업데이트 알림만 수행합니다.
+- Zsh 시작 시 자동 `pull`을 실행하지 않습니다. background `fetch`와 업데이트 알림만 수행합니다.
 - 두 번째 실제 Adapter나 Role별 Module 차이가 생기면 해당 Seam을 새 결정으로 검토합니다.
 
 ## 검토한 대안

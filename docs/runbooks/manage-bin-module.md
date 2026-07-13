@@ -47,7 +47,7 @@ receipt 기본 위치는 다음과 같습니다.
 └── backup/
 ```
 
-Transaction directory 전체가 receipt입니다. `XDG_STATE_HOME`을 설정한 환경에서는 `$XDG_STATE_HOME/dotfiles/transactions/`를 사용합니다. state·transaction·control directory와 backup root는 `0700`, receipt metadata regular file은 `0600`으로 생성됩니다. backup payload는 기존 type과 mode를 유지합니다.
+Transaction directory 전체가 receipt입니다. `XDG_STATE_HOME`을 설정한 환경에서는 `$XDG_STATE_HOME/dotfiles/transactions/`를 사용합니다. directory는 원자적으로 생성하며 새 receipt의 `meta/schema_version`은 `1`입니다. schema field가 없는 기존 receipt는 legacy v1로 계속 읽습니다. state·transaction·control directory와 backup root는 `0700`, receipt metadata regular file은 `0600`으로 생성됩니다. backup payload는 기존 type과 mode를 유지합니다.
 
 적용 뒤 읽기 전용 검사를 실행합니다.
 

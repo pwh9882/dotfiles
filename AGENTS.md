@@ -63,7 +63,7 @@ Shell 설정은 공통 파일과 checkout 밖의 Local Adapter로 분리한다.
 - `~/.config/dotfiles/bash.local` — 기기별 interactive Bash 설정
 - `~/.zshenv.secrets` — secret, 사설 endpoint, 개인 경로
 
-`zsh/init.sh`와 `bash/init.sh`는 기존 `~/.zshrc.local`, `~/.zshenv.local`, `~/.bashrc.local`을 XDG Local Adapter로 한 번 복사한다. migration 전 머신에서는 공통 shell 파일이 기존 경로를 읽는다. 새 머신별 값을 tracked hostname 파일에 추가하지 않는다.
+`zsh/init.sh`와 `bash/init.sh`는 package 설치 전에 XDG Local Adapter가 readable regular file인지 검사하고, 기존 `~/.zshrc.local`, `~/.zshenv.local`, `~/.bashrc.local`을 한 번 복사한다. migration 전 머신에서는 공통 shell 파일이 기존 경로를 읽는다. 새 머신별 값을 tracked hostname 파일에 추가하지 않는다.
 
 ## Init System
 

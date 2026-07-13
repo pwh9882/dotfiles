@@ -150,16 +150,18 @@ df_tx_begin() {
       ;;
   esac
   now="$(date -u '+%Y%m%dT%H%M%SZ')"
-  DF_TX_ID="${now}-$$-${RANDOM}"
-  DF_TX_DIR="$DF_TX_ROOT/$DF_TX_ID"
   DF_ACTION_SEQ=0
 
   umask 077
-  mkdir -p "$DF_TX_DIR/meta" "$DF_TX_DIR/actions" "$DF_TX_DIR/backup" || return 1
+  mkdir -p "$DF_TX_ROOT" || return 1
+  DF_TX_DIR="$(mktemp -d "$DF_TX_ROOT/${now}-$$-XXXXXX")" || return 1
+  DF_TX_ID="${DF_TX_DIR##*/}"
+  mkdir "$DF_TX_DIR/meta" "$DF_TX_DIR/actions" "$DF_TX_DIR/backup" || return 1
   chmod 700 "$DF_STATE_DIR" "$DF_TX_ROOT" "$DF_TX_DIR" \
     "$DF_TX_DIR/meta" "$DF_TX_DIR/actions" "$DF_TX_DIR/backup" || return 1
 
   revision="$(git -C "$DF_ROOT" rev-parse --verify HEAD 2>/dev/null || printf 'unknown')"
+  df_atomic_write "$DF_TX_DIR/meta/schema_version" "1" || return 1
   df_atomic_write "$DF_TX_DIR/meta/id" "$DF_TX_ID" || return 1
   df_atomic_write "$DF_TX_DIR/meta/module" "$module" || return 1
   df_atomic_write "$DF_TX_DIR/meta/repo_revision" "$revision" || return 1
@@ -539,7 +541,7 @@ df_receipt_required_file() {
 df_validate_receipt_shape() {
   local tx_dir="$1"
   local action_entry action_dir name field operation target source before_type backup_rel phase
-  local id module
+  local id module schema_version
   local failed=0
 
   for name in meta actions backup; do
@@ -554,6 +556,17 @@ df_validate_receipt_shape() {
     df_receipt_required_file "$tx_dir/meta/$field" || failed=1
   done
   [ "$failed" -eq 0 ] || return 1
+
+  # Receipts created before schema_version was introduced are legacy v1.
+  # Once the field exists it must be a regular file containing exactly 1.
+  if [ -e "$tx_dir/meta/schema_version" ] || [ -L "$tx_dir/meta/schema_version" ]; then
+    df_receipt_required_file "$tx_dir/meta/schema_version" || return 1
+    schema_version="$(cat "$tx_dir/meta/schema_version")"
+    if [ "$schema_version" != "1" ]; then
+      df_error "malformed transaction receipt: unsupported schema version in $tx_dir"
+      failed=1
+    fi
+  fi
 
   id="$(cat "$tx_dir/meta/id")"
   if [ "$id" != "$(basename "$tx_dir")" ]; then

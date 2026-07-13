@@ -2,7 +2,7 @@
 
 Conda, Homebrew, Flutter처럼 머신마다 다른 도구 초기화는 `~/.config/dotfiles/zsh.local`에 둡니다. 모든 zsh 실행에 필요한 최소 환경은 `~/.config/dotfiles/zshenv.local`에 둡니다. SSH 별칭, 원격 경로, AWS profile, 개인 CloudStorage 경로는 `~/.zshenv.secrets`에 둡니다.
 
-`zsh/init.sh`를 실행하면 기존 `~/.zshrc.local`과 `~/.zshenv.local` 내용을 새 XDG 경로로 복사합니다. 기존 파일은 migration 확인을 위해 그대로 둡니다.
+`zsh/init.sh`를 실행하면 package 설치 전에 Local Adapter가 readable regular file인지 검사하고, 기존 `~/.zshrc.local`과 `~/.zshenv.local` 내용을 새 XDG 경로로 복사합니다. 기존 파일은 migration 확인을 위해 그대로 둡니다. directory, broken symlink, FIFO, 읽을 수 없는 파일이면 변경 전에 중단합니다.
 
 ## 최초 1회 설정
 

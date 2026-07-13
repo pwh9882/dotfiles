@@ -2,7 +2,7 @@
 
 ## 평소에는 자동으로 동작합니다
 
-셸, WezTerm, tmux, editor 설정은 저장소 파일에 연결되어 있습니다. 새 셸은 6시간 간격으로 background `git fetch`를 실행합니다. 새 커밋이 있으면 다음 셸에서 다음과 같이 알려줍니다.
+셸, WezTerm, tmux, editor 설정은 저장소 파일에 연결되어 있습니다. 새 Zsh 셸은 6시간 간격으로 background `git fetch`를 실행합니다. 새 커밋이 있으면 다음 Zsh 셸에서 다음과 같이 알려줍니다.
 
 ```text
 dotfiles: 업데이트 3개 있음 — git -C /path/to/dotfiles pull --ff-only

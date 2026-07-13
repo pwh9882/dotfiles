@@ -8,12 +8,18 @@ ZSHENV_LOCAL_FILE="$LOCAL_CONFIG_DIR/zshenv.local"
 
 # shellcheck source=../lib/dotfiles/legacy_links.sh
 . "$SCRIPT_DIR/../lib/dotfiles/legacy_links.sh"
+# shellcheck source=../lib/dotfiles/local_adapter.sh
+. "$SCRIPT_DIR/../lib/dotfiles/local_adapter.sh"
 
 # Validate every managed HOME link before package installation or file writes.
 # The legacy init is not transactional, so a conflict stops the whole link
 # phase before an earlier destination is changed.
 df_legacy_preflight_exact_link "$SCRIPT_DIR/.zshenv" "$HOME/.zshenv"
 df_legacy_preflight_exact_link "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
+df_local_adapter_preflight_dir "${LOCAL_CONFIG_DIR%/*}"
+df_local_adapter_preflight_dir "$LOCAL_CONFIG_DIR"
+df_local_adapter_preflight_file "$ZSHENV_LOCAL_FILE"
+df_local_adapter_preflight_file "$LOCAL_FILE"
 
 # ---- Helper: detect and activate Homebrew ----
 setup_brew() {

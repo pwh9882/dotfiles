@@ -38,7 +38,7 @@ git config rebase.autoStash true
 - 기기 간 동기화 시 uncommitted 변경사항이 있는 상태에서 pull하는 경우가 잦다
 - autoStash가 pull 전 자동 stash → pull 후 자동 unstash를 처리해준다
 
-새 셸은 6시간 간격으로 background `git fetch`를 실행한다. 새 commit이 있으면 pull 명령을 알려주며 HEAD와 worktree는 자동으로 변경하지 않는다.
+새 Zsh 셸은 6시간 간격으로 background `git fetch`를 실행한다. 새 commit이 있으면 pull 명령을 알려주며 HEAD와 worktree는 자동으로 변경하지 않는다.
 
 ## 🚀 빠른 시작
 
