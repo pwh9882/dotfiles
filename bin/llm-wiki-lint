@@ -111,7 +111,9 @@ emit fail "$COVERAGE"
 #    - target missing -> warn (OKF tolerates intentional not-yet-written
 #      knowledge, but list them).
 LINKS=$(git -c core.quotepath=off ls-files '*.md' | while IFS= read -r f; do
-  grep -oE '\]\(([^)#][^)]*)\)' "$f" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//' | while IFS= read -r target; do
+  # fenced code blocks and inline code spans are documentation examples, not links
+  sed '/^```/,/^```/d; s/`[^`]*`//g' "$f" 2>/dev/null \
+    | grep -oE '\]\(([^)#][^)]*)\)' | sed -E 's/^\]\(//; s/\)$//' | while IFS= read -r target; do
     [[ "$target" == http://* || "$target" == https://* || "$target" == mailto:* || "$target" == ssh://* || "$target" == file://* ]] && continue
     target="${target%%#*}"
     [[ -z "$target" ]] && continue
