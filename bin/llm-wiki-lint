@@ -2,7 +2,8 @@
 # llm-wiki-lint — mechanical consistency checks for the LLM-WIKI bundle.
 #
 # FAIL (exit 1): frontmatter violations, git-tracked binaries/raw dumps,
-#                index coverage gaps.
+#                index coverage gaps, directory links (Obsidian cannot open
+#                a link whose target is a folder — link its index.md).
 # warn (exit 0): broken relative links, .md filenames with spaces,
 #                commit prefixes not matching a documented instance_id,
 #                stale next.md / state snapshot.
@@ -104,7 +105,11 @@ COVERAGE=$(git -c core.quotepath=off ls-files '*index.md' | sed 's|/index.md$||;
 done)
 emit fail "$COVERAGE"
 
-# 4. Broken relative markdown links (warn — OKF tolerates, but list them)
+# 4. Relative markdown link targets.
+#    - target is a directory -> FAIL: Obsidian cannot open folder links;
+#      the link must point at the folder's index.md (or another file).
+#    - target missing -> warn (OKF tolerates intentional not-yet-written
+#      knowledge, but list them).
 LINKS=$(git -c core.quotepath=off ls-files '*.md' | while IFS= read -r f; do
   grep -oE '\]\(([^)#][^)]*)\)' "$f" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//' | while IFS= read -r target; do
     [[ "$target" == http://* || "$target" == https://* || "$target" == mailto:* || "$target" == ssh://* || "$target" == file://* ]] && continue
@@ -121,10 +126,17 @@ LINKS=$(git -c core.quotepath=off ls-files '*.md' | while IFS= read -r f; do
     else
       resolved="$(dirname "$f")/${target}"
     fi
-    [[ -e "$resolved" ]] || echo "broken link in $f -> $target"
+    if [[ -d "$resolved" ]]; then
+      echo "directory link (Obsidian cannot open folder links; link ${target%/}/index.md instead): $f -> $target"
+    elif [[ ! -e "$resolved" ]]; then
+      echo "broken link in $f -> $target"
+    fi
   done
 done | sort -u)
-emit warn "$LINKS"
+DIRLINKS=$(grep '^directory link' <<< "$LINKS" || true)
+BROKENLINKS=$(grep -v '^directory link' <<< "$LINKS" || true)
+emit fail "$DIRLINKS"
+emit warn "$BROKENLINKS"
 
 # 5. Concept .md filenames with spaces (kebab-case convention)
 SPACES=$( { git -c core.quotepath=off ls-files '*.md' | grep ' ' || true; } | sed 's/^/filename has spaces (kebab-case preferred): /')
