@@ -27,6 +27,99 @@
                         ]
                     },
                     {
+                        "description": "Screen Sharing: hangul key switches the local input source instead of reaching the remote",
+                        "manipulators": [
+                            {
+                                "conditions": [
+                                    {
+                                        "bundle_identifiers": [
+                                            "^com\\.apple\\.ScreenSharing$"
+                                        ],
+                                        "type": "frontmost_application_if"
+                                    },
+                                    {
+                                        "input_sources": [{ "language": "^ko$" }],
+                                        "type": "input_source_if"
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "f18",
+                                    "modifiers": { "optional": ["any"] }
+                                },
+                                "to": [
+                                    { "select_input_source": { "input_source_id": "^com\\.apple\\.keylayout\\.ABC$" } }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "bundle_identifiers": [
+                                            "^com\\.apple\\.ScreenSharing$"
+                                        ],
+                                        "type": "frontmost_application_if"
+                                    },
+                                    {
+                                        "input_sources": [{ "language": "^ko$" }],
+                                        "type": "input_source_unless"
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "f18",
+                                    "modifiers": { "optional": ["any"] }
+                                },
+                                "to": [
+                                    { "select_input_source": { "input_mode_id": "^com\\.apple\\.inputmethod\\.Korean\\.2SetKorean$" } }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "bundle_identifiers": [
+                                            "^com\\.apple\\.ScreenSharing$"
+                                        ],
+                                        "type": "frontmost_application_if"
+                                    },
+                                    {
+                                        "input_sources": [{ "language": "^ko$" }],
+                                        "type": "input_source_if"
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "right_command",
+                                    "modifiers": { "optional": ["any"] }
+                                },
+                                "to": [
+                                    { "select_input_source": { "input_source_id": "^com\\.apple\\.keylayout\\.ABC$" } }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "bundle_identifiers": [
+                                            "^com\\.apple\\.ScreenSharing$"
+                                        ],
+                                        "type": "frontmost_application_if"
+                                    },
+                                    {
+                                        "input_sources": [{ "language": "^ko$" }],
+                                        "type": "input_source_unless"
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "right_command",
+                                    "modifiers": { "optional": ["any"] }
+                                },
+                                "to": [
+                                    { "select_input_source": { "input_mode_id": "^com\\.apple\\.inputmethod\\.Korean\\.2SetKorean$" } }
+                                ],
+                                "type": "basic"
+                            }
+                        ]
+                    },
+                    {
                         "description": "Changed hjkl to arrow keys and Others",
                         "manipulators": [
                             {
