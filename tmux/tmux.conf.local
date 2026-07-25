@@ -78,6 +78,8 @@ set -as terminal-features "*:RGB"
 # Claude Code 등 TUI가 보는 COLORTERM env가 tmux 통과해도 truecolor로 유지되도록
 set -ag update-environment "COLORTERM"
 set-environment -g COLORTERM truecolor
+# tmux 서버를 시작한 프로세스의 색상 비활성화 설정은 pane에 전파하지 않음
+set-environment -gu NO_COLOR
 
 
 # -- theming -------------------------------------------------------------------
