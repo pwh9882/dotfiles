@@ -17,7 +17,8 @@ llm-instance
 llm-wiki-git
 llm-wiki-status
 llm-wiki-commit
-llm-wiki-lint'
+llm-wiki-lint
+sn550-temp'
 
 TEST_NUMBER=0
 FAILURES=0
@@ -205,7 +206,7 @@ assert_all_managed_links() {
       count=$((count + 1))
     fi
   done
-  [ "$count" -eq 7 ] || fail "managed bin directory contains $count entries, expected 7"
+  [ "$count" -eq 8 ] || fail "managed bin directory contains $count entries, expected 8"
 }
 
 assert_no_managed_entries() {
@@ -752,9 +753,9 @@ test_partial_rollback_retry_refuses_drift_on_completed_action() {
   assert_failure
   CASE_FAULT=''
 
-  restored_target="$CASE_HOME/.local/bin/llm-wiki-lint"
+  restored_target="$CASE_HOME/.local/bin/sn550-temp"
   [ ! -e "$restored_target" ] && [ ! -L "$restored_target" ] || fail 'fault did not finish the expected first rollback action'
-  ln -s "$ROOT/bin/llm-wiki-lint" "$restored_target"
+  ln -s "$ROOT/bin/sn550-temp" "$restored_target"
 
   run_cli rollback "$applied_tx_id"
   assert_failure
@@ -823,7 +824,7 @@ test_rollback_refuses_drift_without_partial_changes() {
   [ ! -L "$CASE_HOME/.local/bin/dotfiles" ] || fail 'drifted path was overwritten'
   assert_equal 'user changed this after apply' "$(sed -n '1p' "$CASE_HOME/.local/bin/dotfiles")"
 
-  for tool in dotfiles-check llm-instance llm-wiki-git llm-wiki-status llm-wiki-commit llm-wiki-lint; do
+  for tool in dotfiles-check llm-instance llm-wiki-git llm-wiki-status llm-wiki-commit llm-wiki-lint sn550-temp; do
     assert_managed_link "$tool"
   done
 
@@ -901,6 +902,129 @@ test_active_writer_blocks_rollback() {
   rmdir "$CASE_DOTFILES_STATE/write.lock"
 }
 
+test_sn550_temp_resolves_and_formats_report() {
+  local fake_bin
+  local fake_volume
+  new_case
+  fake_bin="$CASE_ROOT/fake-bin"
+  fake_volume="$CASE_ROOT/SN550"
+  mkdir -p "$fake_bin" "$fake_volume"
+
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'case "$2" in' \
+    '  */SN550) printf "   APFS Physical Store:       disk4s3\\n" ;;' \
+    '  /dev/disk4s3) printf "   Part of Whole:             disk4\\n" ;;' \
+    '  /dev/disk4) printf "   Device / Media Name:       WDC WDS100T2B0C-00PXH0\\n" ;;' \
+    '  *) exit 1 ;;' \
+    'esac' >"$fake_bin/diskutil"
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'cat <<EOF' \
+    'SMART overall-health self-assessment test result: PASSED' \
+    'Temperature:                        52 Celsius' \
+    'Warning  Comp. Temperature Time:    10' \
+    'Critical Comp. Temperature Time:    0' \
+    'EOF' >"$fake_bin/smartctl"
+  printf '%s\n' '#!/bin/sh' 'echo "sudo should not run" >&2' 'exit 99' >"$fake_bin/sudo"
+  chmod 0755 "$fake_bin/diskutil" "$fake_bin/smartctl" "$fake_bin/sudo"
+
+  : >"$CASE_OUT"
+  : >"$CASE_ERR"
+  if (
+    export DISKUTIL_BIN="$fake_bin/diskutil"
+    export SMARTCTL_BIN="$fake_bin/smartctl"
+    export SUDO_BIN="$fake_bin/sudo"
+    "$ROOT/bin/sn550-temp" --volume "$fake_volume"
+  ) >"$CASE_OUT" 2>"$CASE_ERR"; then
+    COMMAND_STATUS=0
+  else
+    COMMAND_STATUS=$?
+  fi
+
+  assert_success
+  assert_output_contains 'SN550 (/dev/disk4, WDC WDS100T2B0C-00PXH0)'
+  assert_output_contains 'Temperature: 52 Celsius'
+  assert_output_contains 'SMART health: PASSED'
+  assert_output_contains 'Warning-temperature time: 10 min'
+  assert_output_contains 'Critical-temperature time: 0 min'
+}
+
+test_sn550_temp_retries_with_sudo_after_permission_failure() {
+  local fake_bin
+  local fake_volume
+  new_case
+  fake_bin="$CASE_ROOT/fake-bin"
+  fake_volume="$CASE_ROOT/SN550"
+  mkdir -p "$fake_bin" "$fake_volume"
+
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'case "$2" in' \
+    '  */SN550) printf "   APFS Physical Store:       disk4s3\\n" ;;' \
+    '  /dev/disk4s3) printf "   Part of Whole:             disk4\\n" ;;' \
+    '  /dev/disk4) printf "   Device / Media Name:       WDC WDS100T2B0C-00PXH0\\n" ;;' \
+    '  *) exit 1 ;;' \
+    'esac' >"$fake_bin/diskutil"
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'if [ "${SN550_TEST_SUDO:-}" != 1 ]; then' \
+    '  echo "smartctl: Permission denied" >&2' \
+    '  exit 2' \
+    'fi' \
+    'printf "Temperature:                        53 Celsius\\n"' >"$fake_bin/smartctl"
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'export SN550_TEST_SUDO=1' \
+    'exec "$@"' >"$fake_bin/sudo"
+  chmod 0755 "$fake_bin/diskutil" "$fake_bin/smartctl" "$fake_bin/sudo"
+
+  : >"$CASE_OUT"
+  : >"$CASE_ERR"
+  if (
+    export DISKUTIL_BIN="$fake_bin/diskutil"
+    export SMARTCTL_BIN="$fake_bin/smartctl"
+    export SUDO_BIN="$fake_bin/sudo"
+    "$ROOT/bin/sn550-temp" --volume "$fake_volume"
+  ) >"$CASE_OUT" 2>"$CASE_ERR"; then
+    COMMAND_STATUS=0
+  else
+    COMMAND_STATUS=$?
+  fi
+
+  assert_success
+  assert_output_contains 'Temperature: 53 Celsius'
+}
+
+test_sn550_temp_refuses_an_unexpected_device() {
+  local fake_bin
+  new_case
+  fake_bin="$CASE_ROOT/fake-bin"
+  mkdir -p "$fake_bin"
+
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'printf "   Device / Media Name:       Unknown NVMe\\n"' >"$fake_bin/diskutil"
+  printf '%s\n' '#!/bin/sh' 'exit 99' >"$fake_bin/smartctl"
+  chmod 0755 "$fake_bin/diskutil" "$fake_bin/smartctl"
+
+  : >"$CASE_OUT"
+  : >"$CASE_ERR"
+  if (
+    export DISKUTIL_BIN="$fake_bin/diskutil"
+    export SMARTCTL_BIN="$fake_bin/smartctl"
+    "$ROOT/bin/sn550-temp" --device /dev/disk9
+  ) >"$CASE_OUT" 2>"$CASE_ERR"; then
+    COMMAND_STATUS=0
+  else
+    COMMAND_STATUS=$?
+  fi
+
+  assert_failure
+  assert_equal 65 "$COMMAND_STATUS"
+  assert_error_contains 'refusing unexpected device /dev/disk9 (Unknown NVMe)'
+}
+
 run_test() {
   local name
   local function_name
@@ -921,7 +1045,7 @@ if [ ! -x "$DOTFILES" ]; then
   exit 1
 fi
 
-printf '1..22\n'
+printf '1..25\n'
 run_test 'plan and apply dry-run write nothing' test_plan_and_apply_dry_run_write_nothing
 run_test 'backup plan and dry-run preserve conflicts' test_backup_plan_and_dry_run_preserve_conflicts
 run_test 'apply creates exact links and secure receipt' test_apply_creates_exact_links_and_secure_receipt
@@ -944,6 +1068,9 @@ run_test 'rollback --last refuses same-second ambiguity' test_rollback_last_refu
 run_test 'rollback refuses drift without partial changes' test_rollback_refuses_drift_without_partial_changes
 run_test 'parallel apply is serialized by the writer lock' test_parallel_apply_is_serialized
 run_test 'an active writer blocks rollback before mutation' test_active_writer_blocks_rollback
+run_test 'sn550-temp resolves the physical disk and formats SMART data' test_sn550_temp_resolves_and_formats_report
+run_test 'sn550-temp retries with sudo after a permission failure' test_sn550_temp_retries_with_sudo_after_permission_failure
+run_test 'sn550-temp refuses an unexpected physical device' test_sn550_temp_refuses_an_unexpected_device
 
 if [ "$FAILURES" -ne 0 ]; then
   printf '%d test(s) failed\n' "$FAILURES" >&2

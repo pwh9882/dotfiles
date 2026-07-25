@@ -2,7 +2,7 @@
 
 # Desired state for the first migrated Module.
 
-DF_BIN_TOOLS="dotfiles dotfiles-check llm-instance llm-wiki-git llm-wiki-status llm-wiki-commit llm-wiki-lint"
+DF_BIN_TOOLS="dotfiles dotfiles-check llm-instance llm-wiki-git llm-wiki-status llm-wiki-commit llm-wiki-lint sn550-temp"
 
 df_module_bin() {
   local tool

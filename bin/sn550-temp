@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DEFAULT_VOLUME="${SN550_VOLUME:-/Volumes/SN550}"
+EXPECTED_MODEL="WDC WDS100T2B0C-00PXH0"
+DISKUTIL_BIN="${DISKUTIL_BIN:-/usr/sbin/diskutil}"
+SMARTCTL_BIN="${SMARTCTL_BIN:-}"
+SUDO_BIN="${SUDO_BIN:-/usr/bin/sudo}"
+
+usage() {
+  cat <<'EOF'
+Usage: sn550-temp [--full] [--volume PATH] [--device /dev/diskN]
+
+Finds the physical NVMe device behind /Volumes/SN550 and prints its current
+temperature, SMART health, and accumulated warning/critical-temperature time.
+
+Options:
+  --full           Print the complete smartctl report after the summary.
+  --volume PATH    Resolve the device from another APFS volume.
+  --device PATH    Use an explicit whole-disk device instead of auto-detection.
+  -h, --help       Show this help.
+EOF
+}
+
+trim_field() {
+  awk -F: -v key="$1" '
+    {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+    }
+    index(line, key ":") == 1 {
+      value = substr(line, length(key) + 2)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      print value
+      exit
+    }
+  '
+}
+
+volume="$DEFAULT_VOLUME"
+device=""
+full=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --full)
+      full=1
+      shift
+      ;;
+    --volume)
+      [[ $# -ge 2 ]] || {
+        echo "sn550-temp: --volume requires a path" >&2
+        exit 64
+      }
+      volume="$2"
+      shift 2
+      ;;
+    --device)
+      [[ $# -ge 2 ]] || {
+        echo "sn550-temp: --device requires a device path" >&2
+        exit 64
+      }
+      device="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "sn550-temp: unknown argument: $1" >&2
+      usage >&2
+      exit 64
+      ;;
+  esac
+done
+
+if [[ -z "$SMARTCTL_BIN" ]]; then
+  SMARTCTL_BIN="$(command -v smartctl || true)"
+fi
+if [[ -z "$SMARTCTL_BIN" || ! -x "$SMARTCTL_BIN" ]]; then
+  echo "sn550-temp: smartctl not found; install smartmontools first" >&2
+  exit 69
+fi
+
+if [[ -z "$device" ]]; then
+  [[ -d "$volume" ]] || {
+    echo "sn550-temp: volume is not mounted: $volume" >&2
+    exit 72
+  }
+
+  volume_info="$("$DISKUTIL_BIN" info "$volume")"
+  physical_store="$(printf '%s\n' "$volume_info" | trim_field "APFS Physical Store")"
+  [[ -n "$physical_store" ]] || {
+    echo "sn550-temp: could not resolve the APFS physical store for $volume" >&2
+    exit 70
+  }
+
+  store_info="$("$DISKUTIL_BIN" info "/dev/$physical_store")"
+  whole_disk="$(printf '%s\n' "$store_info" | trim_field "Part of Whole")"
+  [[ -n "$whole_disk" ]] || {
+    echo "sn550-temp: could not resolve the whole disk for $physical_store" >&2
+    exit 70
+  }
+  device="/dev/$whole_disk"
+fi
+
+device_info="$("$DISKUTIL_BIN" info "$device")"
+model="$(printf '%s\n' "$device_info" | trim_field "Device / Media Name")"
+if [[ "$model" != "$EXPECTED_MODEL" ]]; then
+  echo "sn550-temp: refusing unexpected device $device (${model:-unknown model})" >&2
+  echo "sn550-temp: expected $EXPECTED_MODEL" >&2
+  exit 65
+fi
+
+run_smartctl() {
+  local -a command=("$SMARTCTL_BIN" -a -d nvme "$device")
+
+  if [[ "${1:-direct}" == "sudo" ]]; then
+    command=("$SUDO_BIN" "${command[@]}")
+  fi
+
+  set +e
+  report="$("${command[@]}" 2>&1)"
+  smartctl_status=$?
+  set -e
+}
+
+parse_report() {
+  temperature="$(printf '%s\n' "$report" | trim_field "Temperature")"
+  health="$(printf '%s\n' "$report" | trim_field "SMART overall-health self-assessment test result")"
+  warning_time="$(printf '%s\n' "$report" | trim_field "Warning  Comp. Temperature Time")"
+  critical_time="$(printf '%s\n' "$report" | trim_field "Critical Comp. Temperature Time")"
+}
+
+run_smartctl direct
+parse_report
+
+if [[ -z "$temperature" && "$smartctl_status" -ne 0 && "$EUID" -ne 0 ]]; then
+  run_smartctl sudo
+  parse_report
+fi
+
+if [[ -z "$temperature" ]]; then
+  printf '%s\n' "$report" >&2
+  echo "sn550-temp: smartctl returned no NVMe temperature" >&2
+  if [[ "$smartctl_status" -ne 0 ]]; then
+    exit "$smartctl_status"
+  fi
+  exit 70
+fi
+
+printf 'SN550 (%s, %s)\n' "$device" "$model"
+printf 'Temperature: %s\n' "$temperature"
+[[ -n "$health" ]] && printf 'SMART health: %s\n' "$health"
+[[ -n "$warning_time" ]] && printf 'Warning-temperature time: %s min\n' "$warning_time"
+[[ -n "$critical_time" ]] && printf 'Critical-temperature time: %s min\n' "$critical_time"
+
+if [[ "$full" -eq 1 ]]; then
+  printf '\n%s\n' "$report"
+fi
+
+exit "$smartctl_status"
