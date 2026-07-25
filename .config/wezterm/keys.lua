@@ -21,12 +21,29 @@ end
 -- 로컬 터미널에 남아 드래그가 escape code로 입력된다. 셸 프롬프트가 돌아오는
 -- pane은 zsh precmd(_term_reset_input_modes)가 정리하지만, ssh를 pane의 프로그램
 -- 자체로 띄운 경우엔 정리할 셸이 없다. 터미널에 해제 시퀀스를 직접 주입한다.
--- 마지막 CSI > 4 ; 0 m은 xterm modifyOtherKeys 해제다. 남아 있으면 Ctrl+U가
--- \e[27;5;117~로 인코딩돼 ";5;117~"가 셸에 입력된다.
-local INPUT_MODE_RESET =
-    '\x1b[?9l\x1b[?1000l\x1b[?1001l\x1b[?1002l\x1b[?1003l\x1b[?1004l' ..
-    '\x1b[?1005l\x1b[?1006l\x1b[?1015l\x1b[?1016l\x1b[?2004l\x1b[?25h' ..
-    '\x1b[>4;0m'
+--
+-- RIS(ESC c)는 확실하지만 화면과 스크롤백까지 지운다. 그래서 여기서는 화면
+-- 내용을 건드리지 않는 조각만 모아 RIS에 준하는 범위를 덮는다.
+local INPUT_MODE_RESET = table.concat {
+    -- DECSTR soft reset: 스크롤 영역, 문자셋 G0-G3, insert/origin/keyboard action
+    -- 모드, 커서 표시를 되돌린다. 화면은 지우지 않는다.
+    '\x1b[!p',
+    -- DECSTR이 autowrap을 끄는 구현이 있어 명시적으로 다시 켠다.
+    '\x1b[?7h',
+    -- mouse tracking(9, 1000-1003)과 focus reporting(1004).
+    '\x1b[?9l\x1b[?1000l\x1b[?1001l\x1b[?1002l\x1b[?1003l\x1b[?1004l',
+    -- mouse 좌표 인코딩(1005/1006/1015/1016)과 bracketed paste(2004).
+    '\x1b[?1005l\x1b[?1006l\x1b[?1015l\x1b[?1016l\x1b[?2004l',
+    -- 키 인코딩: xterm modifyOtherKeys와 kitty keyboard 스택.
+    -- modifyOtherKeys가 남으면 Ctrl+U가 \e[27;5;117~로 인코딩된다.
+    '\x1b[>4;0m\x1b[<u',
+    -- alt screen에 갇힌 경우 주 화면으로 복귀. 주 화면이면 no-op이다.
+    '\x1b[?1049l\x1b[?47l',
+    -- 커서 표시와 SGR 속성.
+    '\x1b[?25h\x1b[m',
+    -- 앱이 바꾼 팔레트/전경/배경/커서색을 config 기본값으로 (OSC 104/110-112).
+    '\x1b]104\x07\x1b]110\x07\x1b]111\x07\x1b]112\x07',
+}
 
 -- WezTerm 기본 바인딩과 같이 shifted 글자는 대소문자 두 형태를 모두 등록한다.
 local function reset_input_modes(key)
@@ -34,8 +51,8 @@ local function reset_input_modes(key)
         key = key,
         mods = 'LEADER|SHIFT',
         action = wezterm.action_callback(function(window, pane)
-            -- inject_output은 local pane 전용이다. mux/ssh domain pane에서는
-            -- 화면을 지우더라도 확실한 RIS 리셋으로 물러선다.
+            -- inject_output은 local pane 전용이다. mux/ssh domain pane에는
+            -- 주입할 경로가 없어 파괴적이지만 확실한 RIS로 물러선다.
             local ok = pcall(function() pane:inject_output(INPUT_MODE_RESET) end)
             if not ok then
                 window:perform_action(wezterm.action.ResetTerminal, pane)
