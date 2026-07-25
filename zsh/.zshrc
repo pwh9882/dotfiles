@@ -80,17 +80,29 @@ _wezterm_user_var() {
     fi
 }
 
+# 원격 tmux/TUI가 켠 입력 리포팅 모드는 SSH가 비정상 종료하면(맥북 덮개를 닫아
+# 세션이 죽는 경우 등) 끄는 시퀀스가 오지 않아 로컬 터미널에 그대로 남는다.
+# 그러면 드래그·포커스 전환·붙여넣기가 escape code로 셸에 입력된다.
+# 프롬프트마다 전부 되돌린다. 모드별로:
+#   9,1000-1003  mouse tracking
+#   1004         focus reporting (oh-my-tmux의 focus-events on이 켠다)
+#   1005,1006,1015,1016  mouse 좌표 인코딩
+#   2004         bracketed paste (zle가 줄 편집 시작 시 다시 켠다)
+#   25           cursor 표시
+_term_reset_input_modes() {
+    printf '\033[?9l\033[?1000l\033[?1001l\033[?1002l\033[?1003l\033[?1004l'
+    printf '\033[?1005l\033[?1006l\033[?1015l\033[?1016l\033[?2004l\033[?25h'
+}
+
 _wezterm_set_vars() {
-    # SSH/tmux/TUI sessions can disconnect before disabling terminal mouse modes.
-    # Reset them at the shell prompt so mouse movement/scroll does not leak as input.
-    printf "\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?1015l"
+    _term_reset_input_modes
     _wezterm_user_var WEZTERM_HOST "$_wezterm_host_b64"
     _wezterm_user_var WEZTERM_OS "$_wezterm_os_b64"
     _wezterm_user_var WEZTERM_CWD "$(printf '%s' "${PWD/#$HOME/~}" | base64)"
 }
 precmd_functions+=(_wezterm_set_vars)
 
-alias fixmouse='printf "\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?1015l"'
+alias fixmouse='_term_reset_input_modes'
 
 # ssht [ssh-options] <host>: ssh 접속과 동시에 원격 tmux attach (없으면 생성)
 ssht() {

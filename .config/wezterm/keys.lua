@@ -17,6 +17,30 @@ local function resize_pane(key, direction)
     }
 end
 
+-- 원격 tmux/TUI가 켠 mouse/focus/paste 리포팅 모드는 SSH가 비정상 종료하면
+-- 로컬 터미널에 남아 드래그가 escape code로 입력된다. 셸 프롬프트가 돌아오는
+-- pane은 zsh precmd(_term_reset_input_modes)가 정리하지만, ssh를 pane의 프로그램
+-- 자체로 띄운 경우엔 정리할 셸이 없다. 터미널에 해제 시퀀스를 직접 주입한다.
+local INPUT_MODE_RESET =
+    '\x1b[?9l\x1b[?1000l\x1b[?1001l\x1b[?1002l\x1b[?1003l\x1b[?1004l' ..
+    '\x1b[?1005l\x1b[?1006l\x1b[?1015l\x1b[?1016l\x1b[?2004l\x1b[?25h'
+
+-- WezTerm 기본 바인딩과 같이 shifted 글자는 대소문자 두 형태를 모두 등록한다.
+local function reset_input_modes(key)
+    return {
+        key = key,
+        mods = 'LEADER|SHIFT',
+        action = wezterm.action_callback(function(window, pane)
+            -- inject_output은 local pane 전용이다. mux/ssh domain pane에서는
+            -- 화면을 지우더라도 확실한 RIS 리셋으로 물러선다.
+            local ok = pcall(function() pane:inject_output(INPUT_MODE_RESET) end)
+            if not ok then
+                window:perform_action(wezterm.action.ResetTerminal, pane)
+            end
+        end),
+    }
+end
+
 function M.apply(config, is_macos)
     -- Leader key
     config.leader = { key = 'a', mods = 'CTRL', timeout_milliseconds = 1000 }
@@ -39,6 +63,10 @@ function M.apply(config, is_macos)
         }},
 
         { key = 'Enter', mods = 'SHIFT', action = wezterm.action { SendString = "\x1b\r" } },
+
+        -- 끊긴 SSH가 남긴 mouse/focus 리포팅 해제 (Ctrl+A, Shift+R)
+        reset_input_modes('r'),
+        reset_input_modes('R'),
 
         -- tmux prefix indicator (Ctrl+B → pass through + show badge)
         { key = 'b', mods = 'CTRL', action = wezterm.action.Multiple({
