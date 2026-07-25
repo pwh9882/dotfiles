@@ -21,9 +21,12 @@ end
 -- 로컬 터미널에 남아 드래그가 escape code로 입력된다. 셸 프롬프트가 돌아오는
 -- pane은 zsh precmd(_term_reset_input_modes)가 정리하지만, ssh를 pane의 프로그램
 -- 자체로 띄운 경우엔 정리할 셸이 없다. 터미널에 해제 시퀀스를 직접 주입한다.
+-- 마지막 CSI > 4 ; 0 m은 xterm modifyOtherKeys 해제다. 남아 있으면 Ctrl+U가
+-- \e[27;5;117~로 인코딩돼 ";5;117~"가 셸에 입력된다.
 local INPUT_MODE_RESET =
     '\x1b[?9l\x1b[?1000l\x1b[?1001l\x1b[?1002l\x1b[?1003l\x1b[?1004l' ..
-    '\x1b[?1005l\x1b[?1006l\x1b[?1015l\x1b[?1016l\x1b[?2004l\x1b[?25h'
+    '\x1b[?1005l\x1b[?1006l\x1b[?1015l\x1b[?1016l\x1b[?2004l\x1b[?25h' ..
+    '\x1b[>4;0m'
 
 -- WezTerm 기본 바인딩과 같이 shifted 글자는 대소문자 두 형태를 모두 등록한다.
 local function reset_input_modes(key)

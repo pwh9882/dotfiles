@@ -89,9 +89,13 @@ _wezterm_user_var() {
 #   1005,1006,1015,1016  mouse 좌표 인코딩
 #   2004         bracketed paste (zle가 줄 편집 시작 시 다시 켠다)
 #   25           cursor 표시
+# 마지막 CSI > 4 ; 0 m은 DEC private mode가 아니라 xterm modifyOtherKeys다.
+# 남아 있으면 Ctrl+U 같은 키가 \e[27;5;117~로 인코딩되고, zle가 앞부분만
+# 삼켜서 ";5;117~"가 프롬프트에 그대로 찍힌다. nvim/tmux가 켜고 끄는 모드다.
 _term_reset_input_modes() {
     printf '\033[?9l\033[?1000l\033[?1001l\033[?1002l\033[?1003l\033[?1004l'
     printf '\033[?1005l\033[?1006l\033[?1015l\033[?1016l\033[?2004l\033[?25h'
+    printf '\033[>4;0m'
 }
 
 _wezterm_set_vars() {
