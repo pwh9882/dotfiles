@@ -87,8 +87,10 @@ Shell 설정은 공통 파일과 checkout 밖의 Local Adapter로 분리한다.
 bash zsh/init.sh   # zsh만 설치
 bash tmux/init.sh  # tmux만 설치 (brew/apt/pacman 지원)
 ./bin/dotfiles doctor --only bin  # bin 링크와 트랜잭션 상태 검증
-./bin/dotfiles doctor --only agents-links  # Claude/Codex 공통 지침 링크 검증
+./bin/dotfiles doctor --only agents-links  # Claude/Codex 공통 지침·스킬 링크 검증
 ```
+
+`agents-links`는 공통 지침 파일 (`agents/AGENTS.md`)과 공유 스킬 (`agents/skills/`)을 모두 링크한다. 스킬 원본은 이 저장소 한 곳이고 `~/.agents/skills/<name>`, `~/.claude/skills/<name>`, `~/.codex/skills/<name>`이 전부 그 디렉터리를 가리키므로, 스킬을 고치는 방법은 `agents/skills/<name>/SKILL.md`를 편집하고 커밋한 뒤 각 머신에서 `git pull`하는 것이다. 어느 스킬을 어느 harness에 링크할지는 `lib/dotfiles/modules/agents_links.sh` 상단의 `DF_SKILLS_BOTH`, `DF_SKILLS_CLAUDE_ONLY`, `DF_SKILLS_CODEX_ONLY`가 정한다. 목록에 없는 스킬 (설치형 third-party, 머신 전용)은 그 머신의 실제 디렉터리로 남겨 두고 건드리지 않는다. 기존에 실제 디렉터리로 있던 스킬을 처음 링크로 바꿀 때는 `--backup`이 필요하다.
 
 아직 Transaction Module로 이전하지 않은 Zsh, Bash, Claude statusline, tmux, `.config`의 파일 링크는 `lib/dotfiles/legacy_links.sh`를 사용한다. 정확한 symlink는 no-op, 없는 경로는 새 링크, 일반 파일·디렉터리·다른 symlink는 충돌이다. 모든 대상의 preflight가 끝나기 전에는 링크를 만들지 않는다. Starship override와 Claude settings regular file은 임시 파일을 거쳐 원자적으로 갱신하고, 기존 Zed 설정은 보존한 채 로컬 병합 안내와 함께 중단한다. Legacy bootstrap의 package 설치, 외부 download, `sudo`, `chsh`는 rollback 대상이 아니다.
 
