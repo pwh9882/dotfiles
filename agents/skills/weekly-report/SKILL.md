@@ -1,6 +1,6 @@
 ---
 name: weekly-report
-description: Linear 이슈와 댓글에서 지난 한 주의 작업을 수집해 Obsidian human-inbox/weekly-notes/에 주간 리포트 초안을 작성한다. 사용자가 "주간 리포트", "위클리 리포트", "weekly report" 초안 작성을 요청하면 사용한다. 톤은 korean-tech-writing 스킬 규칙을 따른다.
+description: Linear 이슈와 댓글에서 지난 한 주의 작업을 수집해 Obsidian human-inbox/weekly-notes/에 주간 리포트 초안을 작성한다. 사용자가 "주간 리포트", "위클리 리포트", "weekly report" 초안 작성을 요청하면 사용한다.
 ---
 
 # Weekly Report 초안 작성
@@ -61,7 +61,7 @@ Linear MCP `list_issues`로 지난 1주간 업데이트된 내 이슈를 가져�
 - 다음주 할 일 bullet
 ```
 
-톤 (korean-tech-writing 스킬 규칙과 같다):
+톤:
 
 - 간결한 구어체: "~했습니다", "~중입니다", "~하겠습니다"
 - Linear 이슈 링크를 항목 앞에 두고, indent로 그 이슈에서 한 일을 설명

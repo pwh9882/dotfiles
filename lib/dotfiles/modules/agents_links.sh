@@ -10,7 +10,7 @@
 # Anything not listed (installed third-party skills, machine-local skills like
 # the MacBook's rename-thread or ddps-srv-2's codex-usage-guard) stays a real
 # directory under the harness and is left alone.
-DF_SKILLS_BOTH="korean-tech-writing korean-tech-correction pro-prepare pro-verify"
+DF_SKILLS_BOTH="pro-prepare pro-verify"
 DF_SKILLS_CLAUDE_ONLY="codex weekly-report"
 DF_SKILLS_CODEX_ONLY="claude"
 
