@@ -250,7 +250,7 @@ precmd_functions+=(_wezterm_set_vars)
 - **원격이 stock tmux**: `set-titles off`가 기본이고 raw OSC는 버려지므로
   원격 쪽 신호가 전혀 없다
 
-후자를 위해 `zsh/.zshrc`의 `ssht [ssh-options] <host>` 래퍼는 ssh 접속 **전에**
+후자를 위해 `ssht [ssh-options] <host> [session]` 래퍼는 ssh 접속 **전에**
 target host(마지막 인자)를 로컬에서 `WEZTERM_HOST`로 방출한다 (OS/CWD는
 stale 값 오인 방지를 위해 비움). 원격 설정과 무관하게 배지가 즉시 원격으로
 바뀌고, 종료 시 precmd가 로컬 값으로 복구한다.
@@ -259,6 +259,10 @@ stale 값 오인 방지를 위해 비움). 원격 설정과 무관하게 배지�
 로컬 tmux 층에서 버려진다 (passthrough는 한 층만 벗겨짐). 이 경우에도
 `ssht` 래퍼의 사전 방출 덕분에 호스트 배지는 정상 표시되며, CWD만 원격
 hostname fallback으로 표시된다.
+
+세션 이름을 주면 정확 일치 후 작은 오타를 허용한 고유 최인접 이름을 찾아
+attach한다. 가까운 세션이 없으면 후보를 표시하고 중단한다. 새 세션을 만들려면
+`ssht <host> -n <session>` 또는 `--new`를 쓴다.
 
 ### 새 기기 추가 시
 

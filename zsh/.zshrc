@@ -108,24 +108,6 @@ precmd_functions+=(_wezterm_set_vars)
 
 alias fixmouse='_term_reset_input_modes'
 
-# ssht [ssh-options] <host>: ssh 접속과 동시에 원격 tmux attach (없으면 생성)
-ssht() {
-    if (( $# == 0 )); then
-        print -u2 "usage: ssht [ssh-options] <host>"
-        return 2
-    fi
-    # WezTerm 상태바가 즉시 원격 host를 표시하도록 접속 전에 로컬에서 방출.
-    # 원격이 stock tmux(set-titles off)면 title/user var 어느 쪽 신호도 없다.
-    # stale한 로컬 OS/CWD가 원격 것으로 오인되지 않게 비우고, ssh 종료 후에는
-    # precmd가 로컬 값을 재방출하며 원상복구된다.
-    _wezterm_user_var WEZTERM_HOST "$(printf '%s' "${${@[-1]}##*@}" | base64)"
-    _wezterm_user_var WEZTERM_OS ""
-    _wezterm_user_var WEZTERM_CWD ""
-    local remote_command=$'exec "${SHELL:-/bin/sh}" -lic \'if command -v tmux >/dev/null 2>&1; then tmux attach || tmux new; else echo "ssht: tmux not found on remote host" >&2; exit 127; fi\''
-    command ssh -t "$@" "$remote_command"
-}
-compdef _ssh ssht 2>/dev/null
-
 # cods <ssh-alias> [remote-path]
 # cods [remote-path]
 #   Uses DOTFILES_CODS_SSH_ALIAS when the first argument is an absolute path.
@@ -261,6 +243,7 @@ export CLAUDE_CODE_TMUX_TRUECOLOR=1
 # ---- Dotfiles update availability (background fetch, explicit pull) ----
 DOTFILES_DIR="${${(%):-%x}:A:h:h}"
 [[ -r "$DOTFILES_DIR/zsh/update-check.zsh" ]] && source "$DOTFILES_DIR/zsh/update-check.zsh"
+[[ -r "$DOTFILES_DIR/zsh/ssht.zsh" ]] && source "$DOTFILES_DIR/zsh/ssht.zsh"
 
 # ---- Load machine-specific config ----
 _dotfiles_zsh_local="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/zsh.local"

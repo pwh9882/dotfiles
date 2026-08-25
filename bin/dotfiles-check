@@ -281,6 +281,10 @@ check_ssh_agent_tests() {
   zsh tests/ssh-agent/run.zsh
 }
 
+check_ssht_tests() {
+  zsh tests/ssht/run.zsh
+}
+
 check_shellcheck() {
   local file
   local failed=0
@@ -325,6 +329,7 @@ if [ "$MODE" = "full" ]; then
   run_check "Fail-closed legacy link tests" check_legacy_link_tests
   run_check "Dotfiles update notifier tests" check_update_notifier_tests
   run_check "SSH agent selection tests" check_ssh_agent_tests
+  run_check "ssht tmux session tests" check_ssht_tests
   run_optional_check "ShellCheck errors" check_shellcheck
   run_optional_check "JSON syntax" check_json
   if command -v gitleaks >/dev/null 2>&1; then
