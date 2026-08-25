@@ -86,9 +86,9 @@ result=$(
     '
 )
 
-status=${result%%	*}
+match_outcome=${result%%	*}
 value=${result#*	}
-case "$status" in
+case "$match_outcome" in
     match)
         if [ "$value" != "$query" ]; then
             printf 'ssht: matched tmux session %s -> %s\n' "$query" "$value" >&2

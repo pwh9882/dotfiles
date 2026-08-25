@@ -33,6 +33,11 @@ chmod +x "$tmpdir/bin/tmux"
 
 remote_script="$(_ssht_remote_script)"
 
+rm -f "$tmpdir/log"
+SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" zsh -c "$remote_script" ssht find ADRS
+[[ "$(<"$tmpdir/log")" == 'attach-session -t =ADRS' ]] || fail 'Zsh exact session attach'
+print 'ok - remote script works under a Zsh login shell'
+
 SSHT_TMUX_LOG="$tmpdir/log" SSHT_ATTACH_FAIL=1 PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht default ''
 [[ "$(<"$tmpdir/log")" == 'new-session' ]] || fail 'default new-session fallback'
 print 'ok - default mode creates a session when none exists'
