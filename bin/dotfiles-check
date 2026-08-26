@@ -134,7 +134,8 @@ check_lua_tests() {
   local interpreter
   interpreter="$(lua_command)" || return 2
   "$interpreter" .config/wezterm/theme_test.lua &&
-    "$interpreter" .config/wezterm/projects_test.lua
+    "$interpreter" .config/wezterm/projects_test.lua &&
+    "$interpreter" .config/wezterm/restore_logic_test.lua
 }
 
 check_json() {

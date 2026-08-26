@@ -1,18 +1,62 @@
 -- plugins.lua — macOS-only: resurrect + workspace_switcher
 local wezterm = require 'wezterm'
+local restore_logic = require 'restore_logic'
 local M = {}
-
--- 셸 프로세스 이름 (login shell의 "-zsh" 포함)
-local shell_procs = { ["-zsh"] = true, ["zsh"] = true, ["-bash"] = true, ["bash"] = true, ["-fish"] = true, ["fish"] = true }
 
 local function posix_shell_quote(value)
     return "'" .. tostring(value):gsub("'", "'\"'\"'") .. "'"
+end
+
+local function make_on_pane_restore(resurrect)
+    return function(pane_tree)
+        local action = restore_logic.restore_action(pane_tree)
+        if action.kind == 'skip' then
+            return
+        end
+        if action.kind == 'command' then
+            pane_tree.pane:send_text(wezterm.shell_join_args(action.argv) .. "\r\n")
+            return
+        end
+        resurrect.tab_state.default_on_pane_restore(pane_tree)
+    end
+end
+
+local function make_gui_startup_restore(resurrect, on_pane_restore)
+    return function()
+        local current_state = resurrect.state_manager.save_state_dir .. '/current_state'
+        local file = io.open(current_state, 'r')
+        if not file then
+            return
+        end
+
+        local name = file:read('*line')
+        local state_type = file:read('*line')
+        file:close()
+        if not name or name == '' or state_type ~= 'workspace' then
+            return
+        end
+
+        local ok, err = pcall(function()
+            local state = resurrect.state_manager.load_state(name, state_type)
+            resurrect.workspace_state.restore_workspace(state, {
+                spawn_in_workspace = true,
+                relative = true,
+                restore_text = false,
+                on_pane_restore = on_pane_restore,
+            })
+            wezterm.mux.set_active_workspace(name)
+        end)
+        if not ok then
+            wezterm.emit('resurrect.error', tostring(err))
+        end
+    end
 end
 
 function M.apply(config)
     local resurrect = wezterm.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
     local workspace_switcher = wezterm.plugin.require("https://github.com/MLFlexer/smart_workspace_switcher.wezterm")
     local projects_ok, projects = pcall(require, 'projects')
+    local on_pane_restore = make_on_pane_restore(resurrect)
 
     -- ---- Plugin keybindings ----
 
@@ -42,11 +86,7 @@ function M.apply(config)
                 -- tokens or other sensitive output and is never restored.
                 restore_text = false,
                 close_open_tabs = true,
-                on_pane_restore = function(pane, proc)
-                        if not shell_procs[proc] then
-                            resurrect.tab_state.default_on_pane_restore(pane, proc)
-                        end
-                    end,
+                on_pane_restore = on_pane_restore,
             }
             if type == "workspace" then
                 local state = resurrect.state_manager.load_state(id, "workspace")
@@ -92,11 +132,7 @@ function M.apply(config)
                 restore_text = false,
                 resize_window = false,
                 close_open_tabs = true,
-                on_pane_restore = function(pane, proc)
-                        if not shell_procs[proc] then
-                            resurrect.tab_state.default_on_pane_restore(pane, proc)
-                        end
-                    end,
+                on_pane_restore = on_pane_restore,
             })
         else
             local tab = window:active_tab()
@@ -175,7 +211,7 @@ function M.apply(config)
         save_windows = true,
         save_tabs = true,
     })
-    wezterm.on("gui-startup", resurrect.state_manager.resurrect_on_gui_startup)
+    wezterm.on("gui-startup", make_gui_startup_restore(resurrect, on_pane_restore))
     -- Do not persist pane scrollback in plaintext session state.
     resurrect.state_manager.set_max_nlines(0)
 

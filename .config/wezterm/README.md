@@ -98,6 +98,11 @@ Then in WezTerm:
 - **Manual**: Use `Alt+o` to restore specific saved sessions
 - **Backup**: Use `Alt+s` to manually save current session
 - **Capture policy**: Pane scrollback and terminal text are neither saved nor restored
+- **Process replay policy**: Login shells are not replayed. Ordinary local
+  alternate-screen processes use the plugin default, while `ssht` inline SSH
+  resolver argv is restored as the short `ssht <host> [session]` invocation.
+  Generated `ssht` argv that cannot be parsed safely is skipped instead of
+  being pasted into the shell.
 
 ### 3. Workspace Switching
 - `Ctrl+A` + `s`: Opens fuzzy finder with your most visited directories

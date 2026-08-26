@@ -71,6 +71,8 @@ macOS에서는 다음 키부터 기억하면 됩니다.
 
 layout과 실행 process metadata는 15분마다 저장하며 WezTerm 시작과 workspace 전환 시 복원합니다. pane text와 scrollback은 저장하거나 복원하지 않습니다. 처음 plugin을 불러오는 머신에서는 WezTerm이 GitHub의 `resurrect.wezterm`, `smart_workspace_switcher.wezterm` 저장소를 내려받을 수 있습니다.
 
+복원 시 login shell 자체는 다시 입력하지 않습니다. 일반적인 alternate-screen process는 plugin 기본 동작으로 재실행하지만, `ssht`가 내부적으로 만든 긴 inline SSH resolver argv는 저장된 host와 session을 검증한 뒤 `ssht <host> [session]` 형태로 축약해 재연결합니다. 안전하게 해석할 수 없는 generated `ssht` argv는 raw 문자열을 shell에 붙여 넣지 않고 건너뜁니다. 이 정책은 수동 복원, workspace 자동 복원, WezTerm 시작 복원에 동일하게 적용됩니다.
+
 `Alt+o`는 로컬에 저장한 layout을 다시 구성합니다. 원격 shell process까지 계속 실행하려면 서버에 `wezterm-mux-server`를 운영해야 합니다. 이 선택형 절차는 [WezTerm 원격 mux 가이드](../wezterm-mux.md)에서 다룹니다.
 
 ## 검증
