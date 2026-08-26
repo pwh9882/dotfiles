@@ -11,6 +11,8 @@ MODE="full"
 FAILURES=0
 WARNINGS=0
 
+source "$ROOT/lib/dotfiles/script_language.sh"
+
 usage() {
   cat <<'EOF'
 Usage: dotfiles-check [--quick|--full]
@@ -58,10 +60,20 @@ check_bash_syntax() {
   local file
   local failed=0
   while IFS= read -r -d '' file; do
-    case "$file" in
-      *.sh|./bin/*) bash -n "$file" || failed=1 ;;
-    esac
-  done < <(find . -path './.git' -prune -o -type f -print0)
+    [ "$(df_script_language "$file")" = bash ] || continue
+    bash -n "$file" || failed=1
+  done < <(find . -path './.git' -prune -o -type f \( -name '*.sh' -o -path './bin/*' \) -print0)
+  return "$failed"
+}
+
+check_python_syntax() {
+  local file
+  local failed=0
+  command -v python3 >/dev/null 2>&1 || return 2
+  while IFS= read -r -d '' file; do
+    [ "$(df_script_language "$file")" = python ] || continue
+    python3 -c 'import pathlib, sys; compile(pathlib.Path(sys.argv[1]).read_bytes(), sys.argv[1], "exec")' "$file" || failed=1
+  done < <(find . -path './.git' -prune -o -type f \( -name '*.py' -o -path './bin/*' \) -print0)
   return "$failed"
 }
 
@@ -285,11 +297,16 @@ check_ssht_tests() {
   zsh tests/ssht/run.zsh
 }
 
+check_script_language_tests() {
+  /bin/bash tests/script-language/run.sh
+}
+
 check_shellcheck() {
   local file
   local failed=0
   command -v shellcheck >/dev/null 2>&1 || return 2
   while IFS= read -r -d '' file; do
+    [ "$(df_script_language "$file")" = bash ] || continue
     shellcheck --severity=error "$file" || failed=1
   done < <(find . -path './.git' -prune -o -type f \( -name '*.sh' -o -path './bin/*' \) -print0)
   return "$failed"
@@ -306,7 +323,9 @@ run_optional_check() {
   esac
 }
 
+run_check "Script language classification tests" check_script_language_tests
 run_check "Bash syntax" check_bash_syntax
+run_optional_check "Python syntax" check_python_syntax
 run_optional_check "Zsh syntax" check_zsh_syntax
 run_optional_check "Fish syntax" check_fish_syntax
 run_optional_check "Lua syntax" check_lua_syntax
