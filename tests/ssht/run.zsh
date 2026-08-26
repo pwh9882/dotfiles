@@ -21,7 +21,7 @@ mkdir -p "$tmpdir/bin"
 cat > "$tmpdir/bin/tmux" <<'FAKE_TMUX'
 #!/bin/sh
 case "$1" in
-    list-sessions) printf '%s\n' ADRS backend research ;;
+    list-sessions) printf '%s\n' ADRS backend research titans ;;
     attach-session)
         if [ "${SSHT_ATTACH_FAIL:-}" = 1 ]; then exit 1; fi
         printf '%s\n' "$*" > "$SSHT_TMUX_LOG"
@@ -51,12 +51,19 @@ SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script"
 assert_contains "$(<"$tmpdir/stderr")" 'matched tmux session ARDS -> ADRS'
 print 'ok - one-edit typo selects the unique nearest session'
 
+SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht find ttns 2>"$tmpdir/stderr"
+[[ "$(<"$tmpdir/log")" == 'attach-session -t =titans' ]] || fail 'two-edit fuzzy session attach'
+assert_contains "$(<"$tmpdir/stderr")" 'matched tmux session ttns -> titans'
+print 'ok - two-edit typo selects a close longer session'
+
 if SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht find brand-new 2>"$tmpdir/stderr"; then
     fail 'distant session query should stop'
 fi
-assert_contains "$(<"$tmpdir/stderr")" 'no close tmux session for brand-new'
+assert_contains "$(<"$tmpdir/stderr")" 'tmux session not found: brand-new'
+assert_contains "$(<"$tmpdir/stderr")" 'available tmux sessions:'
+assert_contains "$(<"$tmpdir/stderr")" $'  ADRS\n  backend\n  research\n  titans'
 assert_contains "$(<"$tmpdir/stderr")" 'ssht <host> -n brand-new'
-print 'ok - distant session query stops and explains explicit creation'
+print 'ok - distant session query lists sessions and explains explicit creation'
 
 SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht new ADRS
 [[ "$(<"$tmpdir/log")" == 'new-session -s ADRS' ]] || fail 'forced named session'

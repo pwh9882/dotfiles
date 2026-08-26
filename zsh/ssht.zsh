@@ -24,8 +24,10 @@ if [ "$mode" = new ]; then
     exec tmux new-session -s "$query"
 fi
 
+sessions=$(tmux list-sessions -F '#S' 2>/dev/null) || sessions=
+
 result=$(
-    tmux list-sessions -F '#S' 2>/dev/null |
+    printf '%s' "$sessions" |
     awk -v query="$query" '
         function min3(a, b, c) {
             m = a < b ? a : b
@@ -67,14 +69,19 @@ result=$(
                 best = score
                 count = 1
                 names = original
+                best_length = length(normalized)
             } else if (score == best) {
                 count++
                 names = names ", " original
+                if (length(normalized) > best_length)
+                    best_length = length(normalized)
             }
         }
         END {
-            longest = length(normalized_query)
-            threshold = int(longest * 0.34)
+            comparison_length = length(normalized_query)
+            if (best_length > comparison_length)
+                comparison_length = best_length
+            threshold = int((comparison_length + 2) / 3)
             if (threshold < 1) threshold = 1
             if (count == 1 && best <= threshold)
                 print "match\t" names
@@ -88,6 +95,15 @@ result=$(
 
 match_outcome=${result%%	*}
 value=${result#*	}
+show_sessions() {
+    if [ -n "$sessions" ]; then
+        printf 'ssht: available tmux sessions:\n' >&2
+        printf '%s\n' "$sessions" | sed 's/^/  /' >&2
+    else
+        printf 'ssht: available tmux sessions: (none)\n' >&2
+    fi
+}
+
 case "$match_outcome" in
     match)
         if [ "$value" != "$query" ]; then
@@ -97,12 +113,12 @@ case "$match_outcome" in
         ;;
     ambiguous)
         printf 'ssht: ambiguous tmux session %s: %s\n' "$query" "$value" >&2
+        show_sessions
         exit 2
         ;;
     missing)
-        printf 'ssht: no close tmux session for %s\n' "$query" >&2
-        printf 'ssht: available sessions: ' >&2
-        tmux list-sessions -F '#S' 2>/dev/null | paste -sd ', ' - >&2
+        printf 'ssht: tmux session not found: %s\n' "$query" >&2
+        show_sessions
         printf 'ssht: create one with: ssht <host> -n %s\n' "$query" >&2
         exit 2
         ;;
