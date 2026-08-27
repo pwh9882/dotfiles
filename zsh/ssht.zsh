@@ -16,8 +16,10 @@ mode=$1
 query=$2
 
 if [ "$mode" = default ]; then
-    tmux attach-session 2>/dev/null || exec tmux new-session
-    exit $?
+    if tmux has-session 2>/dev/null; then
+        exec tmux attach-session \; choose-tree -Zs
+    fi
+    exec tmux new-session
 fi
 
 if [ "$mode" = new ]; then

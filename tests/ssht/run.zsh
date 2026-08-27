@@ -22,6 +22,7 @@ cat > "$tmpdir/bin/tmux" <<'FAKE_TMUX'
 #!/bin/sh
 case "$1" in
     list-sessions) printf '%s\n' ADRS backend molyday research research-old titans ;;
+    has-session) [ "${SSHT_HAS_SESSIONS:-1}" = 1 ] ;;
     attach-session)
         if [ "${SSHT_ATTACH_FAIL:-}" = 1 ]; then exit 1; fi
         printf '%s\n' "$*" > "$SSHT_TMUX_LOG"
@@ -38,9 +39,13 @@ SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" zsh -c "$remote_script" ssh
 [[ "$(<"$tmpdir/log")" == 'attach-session -t =ADRS' ]] || fail 'Zsh exact session attach'
 print 'ok - remote script works under a Zsh login shell'
 
-SSHT_TMUX_LOG="$tmpdir/log" SSHT_ATTACH_FAIL=1 PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht default ''
+SSHT_TMUX_LOG="$tmpdir/log" SSHT_HAS_SESSIONS=0 PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht default ''
 [[ "$(<"$tmpdir/log")" == 'new-session' ]] || fail 'default new-session fallback'
 print 'ok - default mode creates a session when none exists'
+
+SSHT_TMUX_LOG="$tmpdir/log" SSHT_HAS_SESSIONS=1 PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht default ''
+[[ "$(<"$tmpdir/log")" == 'attach-session ; choose-tree -Zs' ]] || fail 'default session chooser'
+print 'ok - default mode opens the Prefix+s session chooser when sessions exist'
 
 SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht find ADRS
 [[ "$(<"$tmpdir/log")" == 'attach-session -t =ADRS' ]] || fail 'exact session attach'

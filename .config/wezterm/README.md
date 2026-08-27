@@ -269,6 +269,8 @@ hostname fallback으로 표시된다.
 이름 순서로 찾아 attach한다. 따라서 `molyday`만 존재할 때 `moly`로 붙을 수
 있다. prefix나 최인접 후보가 여러 개면 자동 선택하지 않는다. 실패 시 현재
 세션을 bullet 목록으로 표시하고, interactive terminal에서는 이름을 강조한다.
+세션 이름을 생략하면 원격에 기존 세션이 있을 때 `Prefix+s`와 같은 확대
+session chooser(`choose-tree -Zs`)를 바로 열고, 세션이 없을 때만 새로 만든다.
 새 세션을 만들려면 `ssht <host> -n <session>` 또는 `--new`를 쓴다.
 
 ### 새 기기 추가 시
