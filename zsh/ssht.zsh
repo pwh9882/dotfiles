@@ -58,11 +58,21 @@ result=$(
             gsub(/[-_. ]/, "", normalized_query)
             best = 1000000
             count = 0
+            exact_count = 0
+            prefix_count = 0
         }
         {
             original = $0
             normalized = tolower(original)
             gsub(/[-_. ]/, "", normalized)
+            if (tolower(original) == tolower(query)) {
+                exact_count++
+                exact_names = exact_count == 1 ? original : exact_names ", " original
+            }
+            if (normalized_query != "" && index(normalized, normalized_query) == 1) {
+                prefix_count++
+                prefix_names = prefix_count == 1 ? original : prefix_names ", " original
+            }
             score = distance(normalized_query, normalized)
             if (tolower(original) == tolower(query)) score = -1
             if (score < best) {
@@ -83,7 +93,15 @@ result=$(
                 comparison_length = best_length
             threshold = int((comparison_length + 2) / 3)
             if (threshold < 1) threshold = 1
-            if (count == 1 && best <= threshold)
+            if (exact_count == 1)
+                print "match\t" exact_names
+            else if (exact_count > 1)
+                print "ambiguous\t" exact_names
+            else if (prefix_count == 1)
+                print "match\t" prefix_names
+            else if (prefix_count > 1)
+                print "ambiguous\t" prefix_names
+            else if (count == 1 && best <= threshold)
                 print "match\t" names
             else if (count > 1 && best <= threshold)
                 print "ambiguous\t" names
@@ -98,7 +116,16 @@ value=${result#*	}
 show_sessions() {
     if [ -n "$sessions" ]; then
         printf 'ssht: available tmux sessions:\n' >&2
-        printf '%s\n' "$sessions" | sed 's/^/  /' >&2
+        if [ "${CLICOLOR_FORCE:-0}" = 1 ] || {
+            [ -t 2 ] && [ "${TERM:-dumb}" != dumb ] && [ -z "${NO_COLOR:-}" ]
+        }; then
+            printf '%s\n' "$sessions" |
+                while IFS= read -r session_name; do
+                    printf '  - \033[1;36m%s\033[0m\n' "$session_name"
+                done >&2
+        else
+            printf '%s\n' "$sessions" | sed 's/^/  - /' >&2
+        fi
     else
         printf 'ssht: available tmux sessions: (none)\n' >&2
     fi

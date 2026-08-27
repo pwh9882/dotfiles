@@ -21,7 +21,7 @@ mkdir -p "$tmpdir/bin"
 cat > "$tmpdir/bin/tmux" <<'FAKE_TMUX'
 #!/bin/sh
 case "$1" in
-    list-sessions) printf '%s\n' ADRS backend research titans ;;
+    list-sessions) printf '%s\n' ADRS backend molyday research research-old titans ;;
     attach-session)
         if [ "${SSHT_ATTACH_FAIL:-}" = 1 ]; then exit 1; fi
         printf '%s\n' "$*" > "$SSHT_TMUX_LOG"
@@ -56,14 +56,29 @@ SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script"
 assert_contains "$(<"$tmpdir/stderr")" 'matched tmux session ttns -> titans'
 print 'ok - two-edit typo selects a close longer session'
 
+SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht find moly 2>"$tmpdir/stderr"
+[[ "$(<"$tmpdir/log")" == 'attach-session -t =molyday' ]] || fail 'unique prefix session attach'
+assert_contains "$(<"$tmpdir/stderr")" 'matched tmux session moly -> molyday'
+print 'ok - unique prefix selects the matching session before fuzzy lookup'
+
+if SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht find rese 2>"$tmpdir/stderr"; then
+    fail 'ambiguous prefix should stop'
+fi
+assert_contains "$(<"$tmpdir/stderr")" 'ambiguous tmux session rese: research, research-old'
+print 'ok - ambiguous prefix stops instead of choosing a fuzzy candidate'
+
 if SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht find brand-new 2>"$tmpdir/stderr"; then
     fail 'distant session query should stop'
 fi
 assert_contains "$(<"$tmpdir/stderr")" 'tmux session not found: brand-new'
 assert_contains "$(<"$tmpdir/stderr")" 'available tmux sessions:'
-assert_contains "$(<"$tmpdir/stderr")" $'  ADRS\n  backend\n  research\n  titans'
+assert_contains "$(<"$tmpdir/stderr")" $'  - ADRS\n  - backend\n  - molyday\n  - research\n  - research-old\n  - titans'
 assert_contains "$(<"$tmpdir/stderr")" 'ssht <host> -n brand-new'
 print 'ok - distant session query lists sessions and explains explicit creation'
+
+CLICOLOR_FORCE=1 SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht find brand-new 2>"$tmpdir/stderr" || true
+assert_contains "$(<"$tmpdir/stderr")" $'  - \e[1;36mADRS\e[0m'
+print 'ok - interactive session names are highlighted without merging entries'
 
 SSHT_TMUX_LOG="$tmpdir/log" PATH="$tmpdir/bin:$PATH" /bin/sh -c "$remote_script" ssht new ADRS
 [[ "$(<"$tmpdir/log")" == 'new-session -s ADRS' ]] || fail 'forced named session'
