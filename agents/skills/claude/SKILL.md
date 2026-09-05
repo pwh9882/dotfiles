@@ -41,6 +41,7 @@ description: Use when the user asks to run Claude Code CLI (claude -p, claude --
 3. Tell the user they can continue anytime by saying "claude resume", and confirm the next step before escalating permissions.
 
 ## Error handling
-- If `claude --version` or a `claude -p` run exits non-zero, stop and report; ask before retrying.
-- If output is empty or truncated, retry once with `--output-format json` to see the structured result and any error subtype.
-- Summarize any warnings or partial results and ask how to adjust.
+- First inspect the exit status, available diagnostics, saved session/output, and any partial changes. A failed or empty final response does not prove that no work ran.
+- Retry a transient failure at most once only when the operation is read-only or known to be safe to repeat and remains within the user's authorization. A version query can be retried without restarting a task.
+- For editing or external actions with uncertain effects, inspect the existing session and resulting state before resuming. Do not start a fresh task merely to obtain a different output format. Ask only when an unresolved choice, uncertain duplicate action, or additional permission requires the user.
+- Stop repeated failures and report the concrete error and partial outcome; never hide failure behind a successful-looking summary.

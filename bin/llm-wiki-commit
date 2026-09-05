@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INSTANCE_ID="${LLM_WIKI_INSTANCE_ID:-$(hostname -s | tr '[:upper:]' '[:lower:]')}"
-
-if [[ $# -lt 1 ]]; then
+if [[ $# -lt 1 || -z "$1" ]]; then
   echo "usage: llm-wiki-commit <summary> [git commit args...]" >&2
-  echo 'example: llm-wiki-commit "record orbit architecture notes"' >&2
+  exit 64
+fi
+
+# The same identity contract applies to agent work and its Git attribution.
+INSTANCE_ID="$(llm-instance)"
+if [[ -n "${LLM_WIKI_INSTANCE_ID:-}" && "$LLM_WIKI_INSTANCE_ID" != "$INSTANCE_ID" ]]; then
+  echo "llm-wiki-commit: LLM_WIKI_INSTANCE_ID disagrees with llm-instance" >&2
   exit 64
 fi
 
 summary="$1"
 shift
 
-if [[ "$summary" == *": "* ]]; then
-  message="$summary"
-else
-  message="$INSTANCE_ID: $summary"
-fi
+case "$summary" in
+  "$INSTANCE_ID: "*) message="$summary" ;;
+  *) message="$INSTANCE_ID: $summary" ;;
+esac
 
 exec llm-wiki-git commit -m "$message" "$@"

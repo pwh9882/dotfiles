@@ -55,11 +55,13 @@ Don't exhaustively verify every statement. Focus on claims that **matter for dec
 
 For each direction Pro proposes, assess:
 
-1. **Alignment with architecture** — Does it fit our V7 principle (feature extraction OK, label emission forbidden)? Does it respect "overview는 건드리지 마라"?
+1. **Alignment with architecture** — Read the reviewed project's current instructions and decisions, including protected artifacts and evidence boundaries. Apply those project constraints; do not transfer another project's rules merely because this skill was used there.
 2. **Past experience** — Have we tried something similar? What happened? (Check `docs/reviews/`, `docs/experiments/`, memory)
-3. **Model-divergence risk** — Is this a prompt-level change? (Same prompt change = opposite effects across models, confirmed 5 times)
+3. **Model-divergence risk** — For prompt-level changes, check the project's per-model results and previous reviews. If behavior differs across models, retain that evidence and assess the relevant models separately. Do not assume divergence without evidence.
 4. **Generality** — Would this work on an unseen domain, or is it benchmark-specific?
 5. **Risk/reward** — What's the downside if it doesn't work? Can it make things worse?
+
+Historical project-specific examples: the earlier V7 constraint allowed feature extraction but prohibited label emission; another instruction protected the overview, and earlier review work recorded opposite prompt effects across models on five occasions. These are discovery clues, not universal rules or independently verified results. Locate the originating project and evidence before applying or citing them. If unavailable, mark the background unverified rather than inventing provenance.
 
 ### Step 5: Write the Review Digest
 
@@ -139,6 +141,6 @@ After writing the report, present a **concise analytical summary** to the user:
   - Request docs & archives: `docs/reviews/request/`
 - **Sequence numbering**: Check existing files in `docs/reviews/` to determine the next sequence number.
 - **Past lessons matter**: If a suggestion resembles something tried before, flag it with what happened.
-- **Model-divergence warning**: If a suggestion involves prompt-level changes, warn about cross-model instability.
+- **Model comparison**: For prompt changes, use the relevant project's per-model evidence; identify missing validation without asserting universal instability.
 - **Be honest**: If you think Pro's direction is wrong, say so and explain why. "Accept unless baseless" means accept valid analysis, not blindly follow every suggestion.
 - **Never skip fact-checking on decision-critical claims**: Even if a claim sounds right, verify it if the whole direction depends on it.

@@ -298,6 +298,11 @@ check_ssht_tests() {
   zsh tests/ssht/run.zsh
 }
 
+check_wiki_wrapper_tests() {
+  command -v python3 >/dev/null 2>&1 || return 2
+  python3 tests/wiki-wrappers/test_wrappers.py
+}
+
 check_script_language_tests() {
   /bin/bash tests/script-language/run.sh
 }
@@ -350,6 +355,7 @@ if [ "$MODE" = "full" ]; then
   run_check "Dotfiles update notifier tests" check_update_notifier_tests
   run_check "SSH agent selection tests" check_ssh_agent_tests
   run_check "ssht tmux session tests" check_ssht_tests
+  run_optional_check "Wiki wrapper regression tests" check_wiki_wrapper_tests
   run_optional_check "ShellCheck errors" check_shellcheck
   run_optional_check "JSON syntax" check_json
   if command -v gitleaks >/dev/null 2>&1; then

@@ -51,11 +51,11 @@ Create `docs/reviews/request/{topic}-review-request.md` with this structure:
 - Include enough context for Pro to understand the project without prior knowledge
 - Be specific about what you want reviewed — vague requests get vague answers
 - Include relevant data/results, not just code
-- Summarize large files rather than including raw data when possible
+- Summarize large files in the request for orientation, while including the underlying raw evidence in the archive for independent inspection
 
-### Step 2: Package tar.gz — COMPREHENSIVE (aim for ~50-100MB)
+### Step 2: Package tar.gz — COMPREHENSIVE (raw evidence included)
 
-The archive must be **self-contained and research-grade**. Pro should be able to understand and analyze the project from the archive alone, without needing any external context. Text data compresses extremely well, so err on the side of including more.
+The archive must be **self-contained and research-grade**. This rule prevents a recurring failure: sending only agent-written summaries when Pro should inspect the actual raw data, code, and results. Do not replace those materials with a narrative digest. Pro should be able to understand and analyze the project from the archive alone, without needing any external context. Text data compresses extremely well, so err on the side of including more.
 
 **What to always include:**
 
@@ -73,10 +73,10 @@ The archive must be **self-contained and research-grade**. Pro should be able to
 **What to exclude:**
 - `.git/`, `__pycache__/`, `.cache/`, `node_modules/`
 - API keys, credentials, `.env` files
-- Very large binary files (>50MB each)
+- Large binaries unrelated to the review; if a large binary is necessary evidence, include it or provide a clearly mapped companion archive
 - Redundant copies of the same data
 
-**Size target**: Aim for 30-100MB compressed. Text/CSV compresses ~10x, so 300MB-1GB uncompressed is fine. If the archive is under 10MB, you're almost certainly missing important context.
+**Size as a coverage signal**: Research packages may reasonably reach 30-100MB compressed; do not cut relevant raw data just to make a small upload. If under 10MB, explicitly check for omitted input data, execution results, code, and reproduction information. A small source project can still be complete: judge the evidence, not a minimum byte count. Include a manifest mapping the review questions to the actual included files, with any material exclusions and their reasons.
 
 ```bash
 tar -czf docs/reviews/request/{topic}-review.tar.gz \
@@ -90,7 +90,7 @@ tar -czf docs/reviews/request/{topic}-review.tar.gz \
 ls -lh docs/reviews/request/{topic}-review.tar.gz
 ```
 
-If it's under 10MB, reconsider what's missing. If over 100MB, check for large binaries to exclude.
+Inspect the archive listing as well as its size. Confirm that the request, code, raw samples, results, and reproduction information are actually inside. For large packages, remove redundant material or split into clearly mapped archives without silently dropping evidence needed for review.
 
 ### Step 3: Output Instructions
 

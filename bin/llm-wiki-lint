@@ -11,6 +11,38 @@
 # Runbook: LLM-WIKI/runbooks/wiki-lint.md
 set -uo pipefail
 
+SCOPE=tracked
+case "${1:-}" in
+  ""|--tracked) ;;
+  --working-tree) SCOPE=working-tree ;;
+  -h|--help)
+    echo "Usage: llm-wiki-lint [--tracked|--working-tree]"
+    echo "Reads working-tree contents of tracked paths (default), or also non-ignored untracked paths."
+    exit 0 ;;
+  *) echo "llm-wiki-lint: unknown option: $1" >&2; exit 64 ;;
+esac
+[[ $# -le 1 ]] || { echo "llm-wiki-lint: too many arguments" >&2; exit 64; }
+
+list_files() {
+  if [[ "$SCOPE" == working-tree ]]; then
+    git -c core.quotepath=off ls-files --cached --others --exclude-standard "$@" | sort -u
+  else
+    git -c core.quotepath=off ls-files "$@"
+  fi
+}
+
+# Minimal scalar reader, not a general YAML parser. Existing simple metadata
+# remains valid; complex/external redirect targets are reviewed manually.
+frontmatter_value() {
+  awk -v key="$2" 'NR==1 {if ($0 != "---") exit; next}
+    /^---[[:space:]]*$/ {exit}
+    index($0, key ":") == 1 {sub(/^[^:]*:[[:space:]]*/, "");
+      sub(/[[:space:]]+$/, ""); print; exit}' "$1" 2>/dev/null
+}
+is_redirect() {
+  [[ "$(frontmatter_value "$1" type)" == Redirect ]]
+}
+
 resolve_wiki_dir() {
   if [[ -n "${LLM_WIKI_DIR:-}" ]]; then
     printf '%s\n' "$LLM_WIKI_DIR"
@@ -60,10 +92,11 @@ reserved_basename() {
   esac
 }
 
-echo "== llm-wiki-lint: $WIKI_DIR"
+echo "== llm-wiki-lint: $WIKI_DIR (scope: $SCOPE)"
 
 # 1. Frontmatter: every tracked non-reserved .md needs '---' + non-empty type:
-FRONTMATTER=$(git -c core.quotepath=off ls-files '*.md' | while IFS= read -r f; do
+FRONTMATTER=$(list_files '*.md' | while IFS= read -r f; do
+  [[ -f "$f" ]] || { echo "tracked path missing from working tree: $f"; continue; }
   reserved_basename "$(basename "$f")" && continue
   if [[ "$(head -1 "$f")" != "---" ]]; then
     echo "frontmatter missing: $f"
@@ -75,42 +108,64 @@ done)
 emit fail "$FRONTMATTER"
 
 # 2. Git-tracked binaries / raw-dump directories
-BINARIES=$( { git -c core.quotepath=off ls-files | grep -Ei '\.(pdf|hwp|hwpx|doc|docx|ppt|pptx|xls|xlsx|zip)$' || true; } \
+BINARIES=$( { list_files | grep -Ei '\.(pdf|hwp|hwpx|doc|docx|ppt|pptx|xls|xlsx|zip)$' || true; } \
   | sed 's/^/binary tracked by git (belongs in vault sources\/): /')
 emit fail "$BINARIES"
-DUMPS=$( { git -c core.quotepath=off ls-files | grep -E '(^|/)(PDFs|extracted)/|/papers/pdf/' || true; } \
+DUMPS=$( { list_files | grep -E '(^|/)(PDFs|extracted)/|/papers/pdf/' || true; } \
   | sed 's/^/raw-dump path tracked by git: /')
 emit fail "$DUMPS"
 
 # 3. Index coverage: in each directory that has an index.md, every non-reserved
 #    tracked sibling .md and every child directory must be mentioned by name.
-COVERAGE=$(git -c core.quotepath=off ls-files '*index.md' | sed 's|/index.md$||; s|^index.md$|.|' | sort -u | while IFS= read -r dir; do
+COVERAGE=$(list_files '*index.md' | sed 's|/index.md$||; s|^index.md$|.|' | sort -u | while IFS= read -r dir; do
   idx="$dir/index.md"
   [[ -f "$idx" ]] || continue
-  git -c core.quotepath=off ls-files "$dir/*.md" | while IFS= read -r f; do
+  list_files "$dir/*.md" | while IFS= read -r f; do
     [[ "$(dirname "$f")" == "$dir" ]] || continue
     base=$(basename "$f")
     reserved_basename "$base" && continue
+    is_redirect "$f" && continue
     grep -qF "${base%.md}" "$idx" || echo "not in $idx: $base"
   done
-  git -c core.quotepath=off ls-files "$dir/*" | while IFS= read -r f; do
+  list_files "$dir/*" | while IFS= read -r f; do
     rel="${f#"$dir"/}"
     child="${rel%%/*}"
     [[ "$rel" == "$child" ]] && continue
     [[ "$child" == _* || "$child" == .* ]] && continue
     echo "$child"
   done | sort -u | while IFS= read -r child; do
+    is_redirect "$dir/$child/index.md" && continue
     grep -qF "$child" "$idx" || echo "not in $idx: $child/"
   done
 done)
 emit fail "$COVERAGE"
+
+# Retired documents need a destination, not a restored active-project index.
+# redirect_to is a wiki-root (/...) or file-relative path. Legacy prose and
+# destinations outside this bundle stay visible as manual-review warnings.
+REDIRECTS=$(list_files '*.md' | while IFS= read -r f; do
+  is_redirect "$f" || continue
+  target="$(frontmatter_value "$f" redirect_to)"
+  if [[ -z "$target" || "$target" == *://* || "$target" == ../..* ]]; then
+    echo "redirect target needs manual review: $f"
+    continue
+  fi
+  if [[ "$target" == /* ]]; then
+    resolved=".${target}"
+  else
+    resolved="$(dirname "$f")/$target"
+  fi
+  [[ -f "$resolved" ]] || echo "missing redirect target: $f -> $target"
+done)
+emit fail "$(grep '^missing redirect target:' <<< "$REDIRECTS" || true)"
+emit warn "$(grep '^redirect target needs manual review:' <<< "$REDIRECTS" || true)"
 
 # 4. Relative markdown link targets.
 #    - target is a directory -> FAIL: Obsidian cannot open folder links;
 #      the link must point at the folder's index.md (or another file).
 #    - target missing -> warn (OKF tolerates intentional not-yet-written
 #      knowledge, but list them).
-LINKS=$(git -c core.quotepath=off ls-files '*.md' | while IFS= read -r f; do
+LINKS=$(list_files '*.md' | while IFS= read -r f; do
   # fenced code blocks and inline code spans are documentation examples, not links
   sed '/^```/,/^```/d; s/`[^`]*`//g' "$f" 2>/dev/null \
     | grep -oE '\]\(([^)#][^)]*)\)' | sed -E 's/^\]\(//; s/\)$//' | while IFS= read -r target; do
@@ -131,7 +186,13 @@ LINKS=$(git -c core.quotepath=off ls-files '*.md' | while IFS= read -r f; do
     if [[ -d "$resolved" ]]; then
       echo "directory link (Obsidian cannot open folder links; link ${target%/}/index.md instead): $f -> $target"
     elif [[ ! -e "$resolved" ]]; then
-      echo "broken link in $f -> $target"
+      if [[ "$target" == LLM-WIKI/* && -f "./${target#LLM-WIKI/}" ]]; then
+        echo "vault-root link needs Git-only translation: $f -> $target"
+      elif [[ "$target" == LLM-WIKI/* && -d "./${target#LLM-WIKI/}" ]]; then
+        echo "directory link (vault root; link its index.md): $f -> $target"
+      else
+        echo "broken link in $f -> $target"
+      fi
     fi
   done
 done | sort -u)
@@ -141,7 +202,7 @@ emit fail "$DIRLINKS"
 emit warn "$BROKENLINKS"
 
 # 5. Concept .md filenames with spaces (kebab-case convention)
-SPACES=$( { git -c core.quotepath=off ls-files '*.md' | grep ' ' || true; } | sed 's/^/filename has spaces (kebab-case preferred): /')
+SPACES=$( { list_files '*.md' | grep ' ' || true; } | sed 's/^/filename has spaces (kebab-case preferred): /')
 emit warn "$SPACES"
 
 # 6. Recent commit subjects should start with a documented instance_id
@@ -155,7 +216,7 @@ fi
 
 # 7b. Lifecycle review triggers (OKF-X dogfood): a doc declaring
 #     lifecycle.review_when.age_days warns once untouched past that window
-REVIEW=$(git -c core.quotepath=off ls-files '*.md' | while IFS= read -r f; do
+REVIEW=$(list_files '*.md' | while IFS= read -r f; do
   days=$(awk 'BEGIN{fm=0} /^---[[:space:]]*$/{fm++; next} fm==1 && /age_days:/ {gsub(/[^0-9]/,""); print; exit} fm>=2{exit}' "$f")
   [[ -z "$days" ]] && continue
   last=$(git log -1 --format=%ct -- "$f" 2>/dev/null)
@@ -167,7 +228,8 @@ emit warn "$REVIEW"
 
 # 7. Staleness hints (45 days since last commit touching the file)
 NOW=$(date +%s)
-STALE=$(for p in projects/llm-wiki-bootstrap/next.md state/current.md; do
+STALE=$(list_files '*.md' | while IFS= read -r p; do
+  [[ "$p" == */next.md || "$p" == state/current.md ]] || continue
   [[ -f "$p" ]] || continue
   last=$(git log -1 --format=%ct -- "$p" 2>/dev/null)
   [[ -z "$last" ]] && continue
