@@ -1,18 +1,24 @@
 ---
 name: pro-prepare
-description: Prepare a review request for GPT-5.6 Pro. Creates a request document and packages a comprehensive (~100MB) archive for ChatGPT Web upload.
+description: Prepare a review request and a comprehensive evidence archive for ChatGPT Web upload or a requested Codex review. Defaults to GPT-6 Astra with medium reasoning; preserves an explicitly selected Pro model.
 ---
 
-# GPT-5.6 Pro Review — Prepare
+# Review Package — Prepare
 
-You are preparing a review request package for GPT-5.6 Pro, a large reasoning model accessible only through ChatGPT Web.
+Prepare a self-contained request and evidence archive for an independent review. The skill name `pro-prepare` is retained for existing workflows.
+
+## Reviewer defaults
+
+- Default reviewer: **GPT-6 Astra**, reasoning **medium** (`gpt-6-astra` / `model_reasoning_effort="medium"`). In ChatGPT Work on the web, select Astra Medium or the equivalent model/effort controls when available. Preserve an explicitly chosen Pro model, effort, or review surface; do not silently substitute a model if it is unavailable.
+- Record the intended model, effort, and surface in the request. These are preparation metadata, not proof that a review ran. Availability depends on the account and client; see [official model guidance](https://learn.chatgpt.com/docs/models).
+- Preparing a package ends with the files and handoff instructions. If the user also requests a Codex review, use `codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' --sandbox read-only --skip-git-repo-check - < docs/reviews/request/{topic}-review-request.md`, in the project directory, following the `codex` skill's diagnostics and session handling when available. Let Codex read the project evidence directly. Do not launch a reviewer merely because this preparation skill was invoked.
 
 ## Context Assessment — Ask vs Autonomous
 
 **Before starting, assess how much context you already have from the current conversation.**
 
 - **Autonomous mode** (sufficient context): If the conversation already established what to review, what questions to ask, and what files are relevant — proceed directly. Write the request document and package the archive without asking. You know the project, recent changes, and what needs Pro's input.
-- **Ask mode** (insufficient context): If invoked cold (no prior conversation, or topic is ambiguous), use `AskUserQuestion` to gather what's needed.
+- **Ask mode** (insufficient context): If invoked cold (no prior conversation, or topic is ambiguous), ask only for the missing context using the current harness's question mechanism.
 
 **Rule of thumb**: If you can write the "Specific Questions" section of the request document right now from conversation context, go autonomous. If you'd be guessing, ask.
 
@@ -30,6 +36,10 @@ Create `docs/reviews/request/{topic}-review-request.md` with this structure:
 
 ```markdown
 # Review Request: {Title}
+
+Reviewer: {selected model; default GPT-6 Astra}
+Reasoning: {selected effort; default medium}
+Surface: {ChatGPT Web / explicitly requested Codex CLI / other selected surface}
 
 ## Context
 [Project background — what it does, current state, key metrics]
@@ -103,11 +113,11 @@ Archive: docs/reviews/request/{topic}-review.tar.gz ({size}MB)
 Request: docs/reviews/request/{topic}-review-request.md
 
 ### Upload Steps
-1. Go to ChatGPT Web (chat.openai.com)
-2. Select GPT-5.6 Pro model
+1. Go to ChatGPT Web (https://chatgpt.com)
+2. Select the model/effort recorded in the request (default: Astra Medium in Work; preserve an explicitly selected Pro model)
 3. Upload the tar.gz file
 4. Copy-paste the request document content as your message
-5. Wait for Pro's response (large reasoning — may take a few minutes)
+5. Wait for the review response; record the model/effort actually used if it differs from the request
 
 ### After Review
 1. Save Pro's response to: docs/reviews/response/{suggested-filename}.md

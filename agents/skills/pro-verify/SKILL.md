@@ -1,11 +1,13 @@
 ---
 name: pro-verify
-description: Digest and analyze a GPT-5.6 Pro review response. Understand what Pro analyzed, what directions it proposed, verify key facts, and produce an actionable strategy digest.
+description: Digest and analyze a Pro, Astra, or Codex review response. Evaluate its proposed directions, verify key facts, and produce an actionable strategy digest.
 ---
 
-# GPT-5.6 Pro Review — Digest & Verify
+# Review Response — Digest & Verify
 
-You are analyzing a GPT-5.6 Pro review response. The goal is to **understand what Pro said, evaluate the direction it proposed, and produce an actionable strategy digest**.
+Analyze the supplied review response. The goal is to **understand the review, evaluate its proposed direction, and produce an actionable strategy digest**. The skill name `pro-verify` and the term "Pro" below retain the existing review workflow; they do not imply a particular model version.
+
+Record the actual reviewer model, effort, and surface when known. Keep historical model labels accurate; mark missing provenance as unknown instead of relabeling older responses as Astra. If the user requests a new Codex follow-up review, default to `gpt-6-astra` with `medium` reasoning unless explicitly overridden, and follow the `codex` skill when available. Verification alone does not launch another reviewer.
 
 ## What This Skill Is Really For
 
@@ -68,10 +70,11 @@ Historical project-specific examples: the earlier V7 constraint allowed feature 
 Create `docs/reviews/{topic}-{sequence_number}.md`:
 
 ```markdown
-# GPT-5.6 Pro Review #{sequence}: {Title}
+# Review #{sequence}: {Title}
 
 Date: {today}
 Input: {archive or source description}
+Reviewer: {actual model / effort / surface, or unknown}
 
 ## What Pro Analyzed
 
