@@ -655,6 +655,8 @@ def main():
     sub.add_parser('publish')
     status = sub.add_parser('status')
     status.add_argument('--json',action='store_true')
+    status.add_argument('-s','--short',action='store_true',help=argparse.SUPPRESS)
+    status.add_argument('-b','--branch',action='store_true',help=argparse.SUPPRESS)
     if argv[0] in ('pull','push'):
         if argv[0] == 'push' and argv[1:] not in ([],['origin'],['origin','main']):
             raise Failure('Managed publication only targets the configured origin main')

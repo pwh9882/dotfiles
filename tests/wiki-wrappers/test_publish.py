@@ -290,6 +290,12 @@ class Publishing(unittest.TestCase):
         self.assertEqual(self.git(self.remote,'log','-1','--format=%an').stdout.strip(),'Original writer')
         self.assertIn('worker: original task description',self.git(self.remote,'log','-1','--format=%B').stdout)
 
+    def test_installed_status_wrapper_accepts_its_legacy_flags(self):
+        result = subprocess.run([str(BIN/'llm-wiki-status')],env=self.clients['worker'][1],
+                                text=True,capture_output=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(json.loads(result.stdout)['pending'],[])
+
 
 if __name__ == '__main__':
     unittest.main()
