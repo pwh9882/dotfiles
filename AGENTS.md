@@ -135,6 +135,7 @@ bash tmux/init.sh  # tmux만 설치 (brew/apt/pacman 지원)
 
 ## LLM-WIKI Git Wrappers
 
+- Managed wiki writes use `llm-wiki-commit "summary" --changes edits.json`; exact replacements edit the live wiki and commit their own delta immediately. `lib/wiki_publish.py` stores authored events outside the vault and a single publisher integrates them. See `docs/runbooks/wiki-publication.md` and ADR-0005. Never require a clean live tree or stash/rebase it as part of managed publication.
 - 원본은 `bin/llm-instance`와 `bin/llm-wiki-*`에 둔다.
 - `bin/init.sh`가 트랜잭션 `bin` Module을 실행해 `dotfiles`, `dotfiles-check`, `llm-instance`, `llm-wiki-*`를 `~/.local/bin/`으로 연결한다.
 - `agents/init.sh`는 `agents-links` Module을 먼저 적용하고, 성공한 경우에만 Hermes/OpenClaw legacy post-config를 실행한다.

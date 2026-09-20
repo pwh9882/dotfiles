@@ -300,7 +300,7 @@ check_ssht_tests() {
 
 check_wiki_wrapper_tests() {
   command -v python3 >/dev/null 2>&1 || return 2
-  python3 tests/wiki-wrappers/test_wrappers.py
+  python3 tests/wiki-wrappers/test_wrappers.py && python3 tests/wiki-wrappers/test_publish.py
 }
 
 check_script_language_tests() {

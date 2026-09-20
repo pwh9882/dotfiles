@@ -4,6 +4,7 @@ dotfiles 적용·검증·복구 절차를 기록합니다. 실행 가능한 명�
 
 ## Runbooks
 
+- [Authored wiki edits and automatic publication](wiki-publication.md)
 - [평소 사용하는 Dotfiles 기능과 명령](daily-dotfiles.md)
 - [`bin` Module 적용과 복구](manage-bin-module.md)
 - [`agents-links` Module 적용과 복구](manage-agents-links.md)

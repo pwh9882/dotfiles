@@ -39,6 +39,17 @@ if [[ -z "$WIKI_DIR" || ! -d "$WIKI_DIR" ]]; then
   exit 2
 fi
 
+publish_config="${LLM_WIKI_PUBLISH_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/llm-wiki/publish.json}"
+case "${1:-status}" in
+  setup|edit|capture|adopt|publish) managed=1 ;;
+  *) managed=0 ;;
+esac
+if [[ "$managed" = 1 || -f "$publish_config" ]]; then
+  module="$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().parent.parent / "lib" / "wiki_publish.py")' "${BASH_SOURCE[0]}")"
+  export LLM_WIKI_DIR="$WIKI_DIR"
+  exec python3 "$module" "$@"
+fi
+
 if [[ ! -e "$WIKI_DIR/.git" ]]; then
   echo "llm-wiki-git: .git is not visible at: $WIKI_DIR" >&2
   echo "Checked: ~/Documents/Obsidian Vault/LLM-WIKI, ~/llm-wiki, ~/obsidian-vault/LLM-WIKI" >&2
