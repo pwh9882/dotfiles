@@ -74,29 +74,44 @@ def identity():
 
 
 def insert_merge(base, ours, theirs):
-    """Merge only independently inserted lines, never choose between edits."""
+    """Merge non-overlapping base ranges and same-boundary insertions.
+
+    Git's context hunks can conflict when received, unpublished lines are absent
+    from main. Compare actual edited ranges, never select between replacements.
+    """
     if any(x is None for x in (base, ours, theirs)):
         return None
     lines = base.splitlines(keepends=True)
-    additions = []
+    edits = []
     for version in (ours, theirs):
-        changes = {}
-        for tag, a, b, c, d in difflib.SequenceMatcher(None, lines, version.splitlines(keepends=True), autojunk=False).get_opcodes():
+        target = version.splitlines(keepends=True)
+        changes = []
+        for tag, a, b, c, d in difflib.SequenceMatcher(None, lines, target, autojunk=False).get_opcodes():
             if tag == 'equal':
                 continue
-            if tag != 'insert':
+            changes.append((a,b,target[c:d]))
+        edits.append(changes)
+    combined = list(edits[0])
+    for incoming in edits[1]:
+        a,b,text = incoming
+        duplicate = False
+        for c,d,current in edits[0]:
+            if incoming == (c,d,current):
+                duplicate = True
+                break
+            if (a < b and c < d and max(a,c) < min(b,d)) or (a == b and c < a < d) or (c == d and a < c < b):
                 return None
-            changes[a] = version.splitlines(keepends=True)[c:d]
-        additions.append(changes)
-    merged = []
-    for position in range(len(lines)+1):
-        left, right = (a.get(position, []) for a in additions)
-        merged.extend(left)
-        if left != right:
-            merged.extend(right)
-        if position < len(lines):
-            merged.append(lines[position])
-    return ''.join(merged)
+        if not duplicate:
+            combined.append(incoming)
+    # Stable order retains both writers' insertion blocks at one boundary.
+    combined.sort(key=lambda change:(change[0],change[1]))
+    output, cursor = [], 0
+    for a,b,text in combined:
+        output.extend(lines[cursor:a])
+        output.extend(text)
+        cursor = b
+    output.extend(lines[cursor:])
+    return ''.join(output)
 
 
 class Wiki:

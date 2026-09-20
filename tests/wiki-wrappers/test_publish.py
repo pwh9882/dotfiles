@@ -296,6 +296,19 @@ class Publishing(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(json.loads(result.stdout)['pending'],[])
 
+    def test_own_insertion_survives_unpublished_context_and_another_published_log(self):
+        wiki, _ = self.clients['worker']
+        (wiki/'log.md').write_text('# History\n\nunpublished prior\n\nold entry\n')
+        self.edit('other',[{'path':'log.md','old':'old entry','new':'published entry\n\nold entry'}])
+        self.publish('other')
+        self.edit('worker',[{'path':'log.md','old':'# History\n','new':'# History\n\nworker entry\n'}])
+        self.publish('worker')
+        text = self.show('log.md')
+        self.assertIn('worker entry',text)
+        self.assertIn('published entry',text)
+        self.assertNotIn('unpublished prior',text)
+        self.assertEqual(json.loads(self.cmd('publisher','status','--json').stdout)['blocked'],[])
+
 
 if __name__ == '__main__':
     unittest.main()
