@@ -29,6 +29,10 @@ class Failure(Exception):
     pass
 
 
+class Busy(Failure):
+    pass
+
+
 def atomic_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd, name = tempfile.mkstemp(prefix='.write-', dir=path.parent)
@@ -160,7 +164,7 @@ class Wiki:
             try:
                 fcntl.flock(stream, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
             except BlockingIOError:
-                raise Failure('Publisher already running; next automatic retry will check progress')
+                raise Busy('Publisher already running; next automatic retry will check progress')
             yield
 
     def require_setup(self, background=False):
@@ -577,6 +581,8 @@ class Wiki:
     def publish(self):
         try:
             return self._publish()
+        except Busy:
+            return dict(state='already-running')
         except Failure as exc:
             previous = read_json(self.state/'health.json',{})
             previous.update(last_attempt=time.time(),errors=[str(exc)])

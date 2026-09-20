@@ -322,6 +322,15 @@ class Publishing(unittest.TestCase):
         self.publish('worker')
         self.assertEqual(self.show('a.md'),'background\n')
 
+    def test_existing_publisher_is_a_successful_noop_not_a_health_error(self):
+        import fcntl
+        state = Path(self.clients['worker'][1]['LLM_WIKI_STATE_DIR'])
+        with (state/'publish.lock').open('a') as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            result = self.cmd('worker','publish')
+            self.assertEqual(json.loads(result.stdout)['state'],'already-running')
+        self.assertFalse((state/'health.json').exists())
+
 
 if __name__ == '__main__':
     unittest.main()
