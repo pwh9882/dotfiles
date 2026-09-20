@@ -82,6 +82,27 @@ class WikiWrappers(unittest.TestCase):
         self.assertNotEqual(self.run_wrapper("llm-wiki-commit").returncode, 0)
         self.assertFalse(self.calls.exists())
 
+    def test_managed_lint_uses_published_paths_not_retired_live_index(self):
+        old = self.git('rev-parse','HEAD').stdout.strip()
+        self.write('new.md','Missing frontmatter\n')
+        self.write('index.md',(self.wiki/'index.md').read_text()+'[New](new.md)\n')
+        self.git('add','new.md','index.md')
+        self.git('commit','-qm','test-machine: publish new note')
+        state = self.root/'publication'
+        state.mkdir()
+        repo = state/'objects.git'
+        subprocess.run(['git','clone','--bare',str(self.wiki),str(repo)],env=self.env,check=True,capture_output=True)
+        head = self.git('rev-parse','HEAD').stdout.strip()
+        subprocess.run(['git','--git-dir',str(repo),'update-ref','refs/remotes/origin/main',head],env=self.env,check=True)
+        subprocess.run(['git','--git-dir',str(repo),'symbolic-ref','HEAD','refs/remotes/origin/main'],env=self.env,check=True)
+        self.git('reset','--mixed',old)
+        config = self.root/'publish.json'
+        config.write_text(json.dumps({'wiki':str(self.wiki),'state':str(state)}))
+        self.env['LLM_WIKI_PUBLISH_CONFIG']=str(config)
+        result = self.run_wrapper('llm-wiki-lint')
+        self.assertEqual(result.returncode,1,result.stdout+result.stderr)
+        self.assertIn('frontmatter missing: new.md',result.stdout)
+
     def test_tracked_default_and_working_tree_scope(self):
         self.write("new.md", "No frontmatter\n")
         self.assertEqual(self.run_wrapper("llm-wiki-lint").returncode, 0)

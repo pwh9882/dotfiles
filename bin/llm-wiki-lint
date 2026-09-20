@@ -70,6 +70,27 @@ if [[ -z "$WIKI_DIR" || ! -d "$WIKI_DIR" ]]; then
 fi
 cd "$WIKI_DIR"
 
+# Project sessions may export their own Git paths. Inspect this wiki only.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE
+publish_config="${LLM_WIKI_PUBLISH_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/llm-wiki/publish.json}"
+history_dir=""
+if [[ -f "$publish_config" ]]; then
+  history_dir="$(python3 - "$publish_config" "$WIKI_DIR" <<'PY'
+from pathlib import Path
+import json, os, sys
+config = json.loads(Path(sys.argv[1]).read_text())
+if Path(config['wiki']).resolve() == Path(sys.argv[2]).resolve():
+    print(Path(os.environ.get('LLM_WIKI_STATE_DIR', config['state'])) / 'objects.git')
+PY
+)" || exit 2
+fi
+if [[ -n "$history_dir" ]]; then
+  lint_scratch="$(mktemp -d "${TMPDIR:-/tmp}/llm-wiki-lint.XXXXXX")" || exit 2
+  trap 'rm -rf "$lint_scratch"' EXIT
+  export GIT_DIR="$history_dir" GIT_WORK_TREE="$WIKI_DIR" GIT_INDEX_FILE="$lint_scratch/index"
+  git read-tree refs/remotes/origin/main || exit 2
+fi
+
 FAILS=0
 WARNS=0
 emit() { # emit <fail|warn> <message-lines-variable-content>
