@@ -13,7 +13,8 @@ def drain_terminal():
   if select.select([m],[],[],0.1)[0]:
    try: os.read(m,65536)
    except OSError: return
-threading.Thread(target=drain_terminal,daemon=True).start()
+drain_thread=threading.Thread(target=drain_terminal,daemon=True)
+drain_thread.start()
 try:
  left=tm('-f','/dev/null','new-session','-d','-P','-F','#{pane_id}','-s','test','-x','80','-y','24',"printf 'abcdefghijklmnopqrstuvwxyz\\n'; sleep 300").strip()
  right=tm('split-window','-h','-P','-F','#{pane_id}','-t',left,"printf 'abcdefghijklmnopqrstuvwxyz\\n'; sleep 300").strip()
@@ -60,4 +61,4 @@ finally:
  try:tm('kill-server')
  except:pass
  if p:p.wait()
- stop_drain.set();os.close(m);os.close(s);scratch.cleanup()
+ stop_drain.set();drain_thread.join(timeout=1);os.close(m);os.close(s);scratch.cleanup()
