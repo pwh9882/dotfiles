@@ -31,6 +31,9 @@ class Publishing(unittest.TestCase):
                            'state.md':'port: 8000\n',
                            'shared.md':'first\n\nsecond\n\nthird\n'}.items():
             (seed / name).write_text(body)
+        (seed/'instances').mkdir()
+        for instance in ['publisher','worker','other']:
+            (seed/'instances'/(instance+'.md')).write_text('---\ninstance_id: '+instance+'\nhostname: test-host\n---\n')
         self.git(seed, 'add', '.')
         self.git(seed, 'commit', '-m', 'baseline')
         self.git(seed, 'remote', 'add', 'origin', str(self.remote))
@@ -308,6 +311,16 @@ class Publishing(unittest.TestCase):
         self.assertIn('published entry',text)
         self.assertNotIn('unpublished prior',text)
         self.assertEqual(json.loads(self.cmd('publisher','status','--json').stdout)['blocked'],[])
+
+    def test_background_publication_does_not_require_live_document_access(self):
+        self.edit('worker',[{'path':'a.md','old':'alpha','new':'background'}])
+        _,env = self.clients['worker']
+        fake = Path(env['HOME'])/'bin/llm-instance'
+        fake.write_text('#!/bin/sh\ncase "$LLM_WIKI_DIR" in\n'
+                        ' */identity) printf "worker\\n" ;;\n'
+                        ' *) echo "live Documents unavailable to daemon" >&2; exit 2 ;;\nesac\n')
+        self.publish('worker')
+        self.assertEqual(self.show('a.md'),'background\n')
 
 
 if __name__ == '__main__':

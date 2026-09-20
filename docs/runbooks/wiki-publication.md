@@ -21,6 +21,14 @@ override these paths. Neither belongs inside the LiveSync vault. The OS job is
 `io.llm-wiki.publish` on macOS or `llm-wiki-publish.timer` on Linux. It runs every
 30 seconds in addition to the immediate background attempt after each edit.
 
+Publication itself does not read the protected live Documents directory. It runs
+`llm-instance` against a derived copy of this instance's document from confirmed
+Git history in the state directory, still validating the machine-local identity
+file and actual hostname. Interactive edits validate against the live wiki. This
+keeps scheduled publication functional on macOS without granting a background
+Python process broader access to Documents. An interrupted live-file transaction
+may require an interactive publication attempt if the daemon cannot access it.
+
 ## Edit and commit in one operation
 
 Prepare a JSON array outside the vault, then submit it:

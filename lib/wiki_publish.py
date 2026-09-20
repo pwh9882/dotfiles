@@ -65,8 +65,10 @@ def metadata(value):
     return value
 
 
-def identity():
-    result = subprocess.run(['llm-instance'], capture_output=True, text=True, check=True)
+def identity(env=None):
+    result = subprocess.run(['llm-instance'], capture_output=True, text=True, env=env)
+    if result.returncode:
+        raise Failure(result.stderr.strip() or 'llm-instance failed with exit '+str(result.returncode))
     value = metadata(result.stdout.strip())
     if os.environ.get('LLM_WIKI_INSTANCE_ID', value) != value:
         raise Failure('LLM_WIKI_INSTANCE_ID disagrees with llm-instance')
@@ -161,12 +163,29 @@ class Wiki:
                 raise Failure('Publisher already running; next automatic retry will check progress')
             yield
 
-    def require_setup(self):
+    def require_setup(self, background=False):
         if not self.config or not self.repo.exists():
             raise Failure('Run llm-wiki-git setup --role source (publisher on the integration instance) first')
         if str(self.wiki) != self.config['wiki']:
             raise Failure('Configured wiki differs from LLM_WIKI_DIR')
-        if identity() != self.config['instance']:
+        environment = None
+        if background:
+            # Publication needs Git objects, not permission to read Documents.
+            # Keep llm-instance authoritative using the same instance document
+            # from confirmed history in a derived, machine-local cache.
+            instance = self.config['instance']
+            document = self.blob('refs/remotes/origin/main','instances/'+instance+'.md')
+            if document is None:
+                raise Failure('Confirmed history lacks the configured instance document')
+            cache = self.state/'identity'
+            directory = cache/'instances'
+            directory.mkdir(parents=True,exist_ok=True,mode=0o700)
+            fd, temporary = tempfile.mkstemp(prefix='.identity-',dir=directory)
+            with os.fdopen(fd,'w') as stream:
+                stream.write(document)
+            os.replace(temporary,directory/(instance+'.md'))
+            environment = dict(os.environ,LLM_WIKI_DIR=str(cache))
+        if identity(environment) != self.config['instance']:
             raise Failure('Publisher state belongs to a different instance')
 
     def setup(self, role, install_service=False):
@@ -440,7 +459,9 @@ class Wiki:
                 with self.lock('edit'):
                     try:
                         self.apply_event(event)
-                    except Failure as exc:
+                    except (Failure,OSError) as exc:
+                        event['error'] = str(exc)
+                        self.save_event(event)
                         errors.append(str(exc))
                         continue
             if event['state'] in ('needs-recovery','published'):
@@ -563,7 +584,7 @@ class Wiki:
             raise
 
     def _publish(self):
-        self.require_setup()
+        self.require_setup(background=True)
         with self.lock('publish',blocking=False):
             # Only this runtime creates these directories, and the lock proves
             # there is no live integration process using them after a crash.
