@@ -22,7 +22,7 @@ try:
  p=subprocess.Popen(['tmux','-S',sock,'attach','-t','test'],stdin=s,stdout=s,stderr=s,env={**os.environ,'TERM':'xterm-256color'});time.sleep(.25)
  x=int(tm('display-message','-p','-t',right,'#{pane_left}'))+3
  for variant in ('before','after'):
-  lines=[re.sub(r"run-shell -b '[^']*'", 'set-option -p @test_notice copied', l.split(' #!important')[0]) for l in config.read_text().splitlines() if l.startswith('bind -T ') and ('MouseDown1Pane' in l or 'MouseDragEnd1Pane' in l)]
+  lines=[re.sub(r"run-shell -b '[^']*'", 'set-option -p @test_notice copied', l.split(' #!important')[0]) for l in config.read_text().splitlines() if l.startswith('bind -T ') and ('MouseDown1Pane' in l or 'MouseDown2Pane' in l or 'MouseDragEnd1Pane' in l)]
   (Path(scratch.name)/'bindings.conf').write_text('\n'.join(lines)+'\n');tm('source',str(Path(scratch.name)/'bindings.conf'))
   if variant=='after':
    entry=[l.split(' #!important')[0] for l in config.read_text().splitlines() if l.startswith('bind -T root ') and ('MouseDown1Pane' in l or 'MouseDrag1Pane' in l)]
@@ -51,6 +51,14 @@ try:
  os.write(m,f'\x1b[<64;{x};1M'.encode());time.sleep(.15)
  assert tm('display-message','-p','-t',right,'#{pane_in_mode}').strip()=='1'
  print('wheel entry: PASS')
+ for mode in ('vi','emacs'):
+  tm('set','-g','mode-keys',mode);tm('copy-mode','-t',right)
+  tm('send-keys','-X','-t',right,'begin-selection');tm('set-buffer','MIDDLE_SENTINEL');time.sleep(.6)
+  os.write(m,f'\x1b[<1;{x};1M\x1b[<1;{x};1m'.encode());time.sleep(.15)
+  assert tm('display-message','-p','-t',right,'#{pane_in_mode}').strip()=='0'
+  assert tm('save-buffer','-')=='MIDDLE_SENTINEL'
+  assert 'paste-buffer' in tm('list-keys','-T','root')
+  print(mode,'middle click exits without copying: PASS')
  tm('respawn-pane','-k','-t',right,"printf '\\033[?1002h'; sleep 300");time.sleep(.2)
  assert tm('display-message','-p','-t',right,'#{mouse_any_flag}').strip()=='1'
  os.write(m,f'\x1b[<0;{x};1M\x1b[<32;{x+5};1M\x1b[<0;{x+5};1m'.encode());time.sleep(.15)

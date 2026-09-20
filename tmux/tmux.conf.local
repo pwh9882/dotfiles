@@ -420,6 +420,10 @@ bind -T copy-mode MouseDragEnd1Pane if-shell -F "#{&&:#{selection_present},#{||:
 bind -T copy-mode-vi MouseDown1Pane select-pane \; send-keys -X clear-selection #!important
 bind -T copy-mode MouseDown1Pane select-pane \; send-keys -X clear-selection #!important
 
+# 가운데 클릭: copy mode만 종료 (복사/붙여넣기/Enter 입력 없음)
+bind -T copy-mode MouseDown2Pane send-keys -X cancel #!important
+bind -T copy-mode-vi MouseDown2Pane send-keys -X cancel #!important
+
 # ctrl b <> 으로 윈도우 밀기
 bind-key S-Left swap-window -t -1\; select-window -t -1
 bind-key S-Right swap-window -t +1\; select-window -t +1
