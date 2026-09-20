@@ -663,7 +663,7 @@ class Wiki:
             directory.mkdir(parents=True,exist_ok=True)
             envlines = '\n'.join('Environment='+quote(k+'='+v) for k,v in environ.items())
             (directory/'llm-wiki-publish.service').write_text('[Unit]\nDescription=Publish authored wiki changes\n[Service]\nType=oneshot\n'+envlines+'\nExecStart='+' '.join(map(quote,command))+'\n')
-            (directory/'llm-wiki-publish.timer').write_text('[Unit]\nDescription=Retry wiki publication\n[Timer]\nOnBootSec=15\nOnUnitInactiveSec=30\nUnit=llm-wiki-publish.service\n[Install]\nWantedBy=timers.target\n')
+            (directory/'llm-wiki-publish.timer').write_text('[Unit]\nDescription=Retry wiki publication\n[Timer]\nOnBootSec=15\nOnUnitInactiveSec=30\nAccuracySec=1s\nUnit=llm-wiki-publish.service\n[Install]\nWantedBy=timers.target\n')
             subprocess.run(['systemctl','--user','daemon-reload'],check=True,capture_output=True)
             subprocess.run(['systemctl','--user','enable','--now','llm-wiki-publish.timer'],check=True,capture_output=True)
         else:
