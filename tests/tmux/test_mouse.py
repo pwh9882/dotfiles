@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """Replay mouse events in an isolated tmux; never access the desktop clipboard."""
-import os,pty,subprocess,time,fcntl,termios,struct,re,tempfile
+import os,pty,subprocess,time,fcntl,termios,struct,re,tempfile,threading,select
 from pathlib import Path
 scratch=tempfile.TemporaryDirectory(prefix='tmux-mouse-test-')
 sock=str(Path(scratch.name)/'socket')
 config=Path(__file__).resolve().parents[2]/'tmux/tmux.conf.local'
 def tm(*args):return subprocess.check_output(['tmux','-S',sock,*args],stderr=subprocess.STDOUT).decode()
 m,s=pty.openpty();fcntl.ioctl(s,termios.TIOCSWINSZ,struct.pack('HHHH',24,80,0,0));p=None
+stop_drain=threading.Event()
+def drain_terminal():
+ while not stop_drain.is_set():
+  if select.select([m],[],[],0.1)[0]:
+   try: os.read(m,65536)
+   except OSError: return
+threading.Thread(target=drain_terminal,daemon=True).start()
 try:
  left=tm('-f','/dev/null','new-session','-d','-P','-F','#{pane_id}','-s','test','-x','80','-y','24',"printf 'abcdefghijklmnopqrstuvwxyz\\n'; sleep 300").strip()
  right=tm('split-window','-h','-P','-F','#{pane_id}','-t',left,"printf 'abcdefghijklmnopqrstuvwxyz\\n'; sleep 300").strip()
@@ -53,4 +60,4 @@ finally:
  try:tm('kill-server')
  except:pass
  if p:p.wait()
- os.close(m);os.close(s);scratch.cleanup()
+ stop_drain.set();os.close(m);os.close(s);scratch.cleanup()
