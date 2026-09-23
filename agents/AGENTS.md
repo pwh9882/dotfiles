@@ -8,3 +8,9 @@ A personal LLM wiki (OKF-style Markdown bundle) is the durable memory shared acr
 - Consult it before machine, infra, or project work: machine paths and roles are in `instances/`, procedures in `runbooks/`, project state and logs in `projects/<name>/`, past decisions in `decisions/`.
 - Update it when durable knowledge changes (infra change, project milestone, decision). On a managed wiki, prepare exact text replacements in a temporary JSON file and run `llm-wiki-commit "<summary>" --changes <file.json>`: this edits the live wiki and immediately records only your change with instance/session/task attribution. Use `[{"path":"relative.md","old":"unique existing text","new":"replacement"}]` or `[{"path":"new.md","create":"complete text"}]`. Do not edit first and infer authorship from the shared dirty tree afterward. `llm-wiki-status` reports pending/blocked publication; automatic retries handle transport. Do not stash others' files, require a clean tree, or run Git integration in the live vault. See the wiki's `runbooks/manage-llm-wiki-git.md` for capture/recovery and non-managed clients.
 - The parent Obsidian vault has two sibling layers: `sources/` (raw source files: papers, PDFs — reference material, not knowledge) and `human-inbox/` (human-owned working area — write there only where the user asks). The wiki links to both by pointer only.
+
+# Git commits and PRs
+
+- Never add attribution or metadata trailers to commit messages or PR descriptions in any project: no `Co-Authored-By`, no `Claude-Session`, no "Generated with" footers. Write only the change summary and body.
+
+Managed LLM-WIKI publication is an explicit exception: its Wiki-* provenance trailers preserve the working instance/session as requested by the operator. This exception does not change other projects.
