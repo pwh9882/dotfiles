@@ -486,6 +486,8 @@ set -g @plugin 'tmux-plugins/tmux-cpu'
 set -g @plugin 'tmux-plugins/tmux-resurrect'
 # Layout/process metadata only. Pane contents may contain secrets.
 set -g @resurrect-capture-pane-contents 'off'
+# Repair `last` if a same-second save race deleted its target.
+set -g @resurrect-hook-post-save-all '~/dotfiles/tmux/resurrect-fix-last.sh'
 set -g @plugin 'tmux-plugins/tmux-continuum'
 set -g @continuum-restore 'on'
 
