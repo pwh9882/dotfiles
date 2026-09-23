@@ -52,6 +52,7 @@ prefix: `Ctrl+b`
 | `prefix` `+` | 패널 전체화면 분리 |
 | `prefix` `q` | 패널 번호 표시 |
 | `prefix` `x` | 패널 닫기 |
+| `` Option+` `` | btop floating pane 열기/닫기 (tmux 3.7+, 닫을 때 크기·위치 기억) |
 
 ### 복사 모드
 

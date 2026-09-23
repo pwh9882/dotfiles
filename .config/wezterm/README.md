@@ -79,6 +79,7 @@ After pressing `Ctrl+A` + `r`, use:
 | `Ctrl+A` + `p` | Project picker | Open project picker |
 | `Cmd+,` | Edit config | Open WezTerm config in nvim |
 | `Cmd+Alt+←/→` | Switch tabs | Navigate between tabs |
+| `` Option+` `` | Send Alt+` | Pass the physical grave key to tmux even when the Korean input source maps it to ₩ |
 
 ## Usage Workflow
 

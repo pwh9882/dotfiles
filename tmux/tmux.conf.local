@@ -441,6 +441,21 @@ unbind C-a #!important
 # display a message after toggling mouse support
 bind m run "cut -c3- '#{TMUX_CONF}' | sh -s _toggle_mouse" \; display 'mouse #{?#{mouse},on,off}'
 
+# Option+` : 현재 창에 btop floating pane 열고 닫기 (tmux 3.7+)
+# 닫을 때 크기·위치를 창 대비 %로 저장했다가 다시 열 때 복원
+%if #{>=:#{version},3.7}
+set -go @btop_float_w 60
+set -go @btop_float_h 60
+set -go @btop_float_x 20
+set -go @btop_float_y 20
+set -g @btop_float_is '#{&&:#{pane_floating_flag},#{==:#{pane_current_command},btop}}'
+bind -n 'M-`' if-shell -F '#{P:#{?#{E:@btop_float_is},1,}}' {
+  run-shell -C 'set -g @btop_float_w #{P:#{?#{E:@btop_float_is},#{e|/:#{e|*:#{pane_width},100},#{window_width}},}} ; set -g @btop_float_h #{P:#{?#{E:@btop_float_is},#{e|/:#{e|*:#{pane_height},100},#{window_height}},}} ; set -g @btop_float_x #{P:#{?#{E:@btop_float_is},#{e|/:#{e|*:#{pane_left},100},#{window_width}},}} ; set -g @btop_float_y #{P:#{?#{E:@btop_float_is},#{e|/:#{e|*:#{pane_top},100},#{window_height}},}} ; kill-pane -t #{P:#{?#{E:@btop_float_is},#{pane_id},}}'
+} {
+  new-pane -x '#{@btop_float_w}%' -y '#{@btop_float_h}%' -X '#{@btop_float_x}%' -Y '#{@btop_float_y}%' btop
+}
+%endif
+
 # move status line to top
 #set -g status-position top
 

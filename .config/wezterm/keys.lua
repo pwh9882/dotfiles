@@ -103,6 +103,9 @@ function M.apply(config, is_macos)
         table.insert(config.keys, { key = '"', mods = 'LEADER', action = wezterm.action.SplitHorizontal { domain = 'CurrentPaneDomain' } })
         table.insert(config.keys, { key = '%', mods = 'LEADER', action = wezterm.action.SplitVertical { domain = 'CurrentPaneDomain' } })
 
+        -- Option+백틱 키: 한글 입력(₩) 상태에서도 tmux에 M-` 전달 (tmux btop floating pane 토글)
+        table.insert(config.keys, { key = 'phys:Grave', mods = 'OPT', action = wezterm.action.SendString '\x1b`' })
+
         -- Word/line navigation
         table.insert(config.keys, { key = 'LeftArrow', mods = 'OPT', action = wezterm.action.SendString '\x1bb' })
         table.insert(config.keys, { key = 'RightArrow', mods = 'OPT', action = wezterm.action.SendString '\x1bf' })
