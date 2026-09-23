@@ -11,7 +11,7 @@ Prepare a self-contained request and evidence archive for an independent review.
 
 - Default reviewer: **GPT-6 Astra**, reasoning **medium** (`gpt-6-astra` / `model_reasoning_effort="medium"`). In ChatGPT Work on the web, select Astra Medium or the equivalent model/effort controls when available. Preserve an explicitly chosen Pro model, effort, or review surface; do not silently substitute a model if it is unavailable.
 - Record the intended model, effort, and surface in the request. These are preparation metadata, not proof that a review ran. Availability depends on the account and client; see [official model guidance](https://learn.chatgpt.com/docs/models).
-- Preparing a package ends with the files and handoff instructions. If the user also requests a Codex review, use `codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' --sandbox read-only --skip-git-repo-check - < docs/reviews/request/{topic}-review-request.md`, in the project directory, following the `codex` skill's diagnostics and session handling when available. Let Codex read the project evidence directly. Do not launch a reviewer merely because this preparation skill was invoked.
+- Preparing a package ends with the files and handoff instructions. If the user also requests a Codex review, use `codex exec -m gpt-6-astra -c 'model_reasoning_effort="medium"' --sandbox read-only --skip-git-repo-check - < docs/reviews/request/{date}-{nn}-{topic}-review-request.md`, in the project directory, following the `codex` skill's diagnostics and session handling when available. Let Codex read the project evidence directly. Do not launch a reviewer merely because this preparation skill was invoked.
 
 ## Context Assessment — Ask vs Autonomous
 
@@ -32,7 +32,8 @@ Prepare a self-contained request and evidence archive for an independent review.
 
 ### Step 1: Write the Request Document
 
-Create `docs/reviews/request/{topic}-review-request.md` with this structure:
+Create `docs/reviews/request/{date}-{nn}-{topic}-review-request.md` with this structure.
+Naming: `{date}` = today as `YYYY-MM-DD`; `{nn}` = creation sequence within that day and directory, starting at `01` (check existing files with the same date prefix to pick the next number). Example: `2026-08-03-01-cross-replay-result-review-request.md`.
 
 ```markdown
 # Review Request: {Title}
@@ -89,7 +90,7 @@ The archive must be **self-contained and research-grade**. This rule prevents a 
 **Size as a coverage signal**: Research packages may reasonably reach 30-100MB compressed; do not cut relevant raw data just to make a small upload. If under 10MB, explicitly check for omitted input data, execution results, code, and reproduction information. A small source project can still be complete: judge the evidence, not a minimum byte count. Include a manifest mapping the review questions to the actual included files, with any material exclusions and their reasons.
 
 ```bash
-tar -czf docs/reviews/request/{topic}-review.tar.gz \
+tar -czf docs/reviews/request/{date}-{nn}-{topic}-review.tar.gz \
   --exclude='.git' --exclude='__pycache__' --exclude='.cache' \
   --exclude='node_modules' --exclude='.env' \
   {comprehensive file list}
@@ -97,7 +98,7 @@ tar -czf docs/reviews/request/{topic}-review.tar.gz \
 
 **After creating the archive, verify the size:**
 ```bash
-ls -lh docs/reviews/request/{topic}-review.tar.gz
+ls -lh docs/reviews/request/{date}-{nn}-{topic}-review.tar.gz
 ```
 
 Inspect the archive listing as well as its size. Confirm that the request, code, raw samples, results, and reproduction information are actually inside. For large packages, remove redundant material or split into clearly mapped archives without silently dropping evidence needed for review.
@@ -109,8 +110,8 @@ After packaging, print:
 ```
 ## Ready for Pro Review
 
-Archive: docs/reviews/request/{topic}-review.tar.gz ({size}MB)
-Request: docs/reviews/request/{topic}-review-request.md
+Archive: docs/reviews/request/{date}-{nn}-{topic}-review.tar.gz ({size}MB)
+Request: docs/reviews/request/{date}-{nn}-{topic}-review-request.md
 
 ### Upload Steps
 1. Go to ChatGPT Web (https://chatgpt.com)
@@ -126,11 +127,11 @@ Request: docs/reviews/request/{topic}-review-request.md
 
 ## File Locations (Fixed Convention)
 
-All projects use the same directory structure:
-- **Request docs**: `docs/reviews/request/{topic}-review-request.md`
-- **Archives**: `docs/reviews/request/{topic}-review.tar.gz`
-- **Pro responses**: `docs/reviews/response/{name}.md`
-- **Review digests**: `docs/reviews/{name}-{seq}.md`
+All projects use the same directory structure. All filenames start with `{date}-{nn}-` (date `YYYY-MM-DD`, then per-day creation sequence `01`, `02`, ...):
+- **Request docs**: `docs/reviews/request/{date}-{nn}-{topic}-review-request.md`
+- **Archives**: `docs/reviews/request/{date}-{nn}-{topic}-review.tar.gz`
+- **Pro responses**: `docs/reviews/response/{date}-{nn}-{topic}-review-response.md`
+- **Review digests**: `docs/reviews/{date}-{nn}-{topic}.md`
 
 Create `docs/reviews/request/` and `docs/reviews/response/` if they don't exist.
 

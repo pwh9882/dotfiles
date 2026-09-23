@@ -67,7 +67,7 @@ Historical project-specific examples: the earlier V7 constraint allowed feature 
 
 ### Step 5: Write the Review Digest
 
-Create `docs/reviews/{topic}-{sequence_number}.md`:
+Create `docs/reviews/{date}-{nn}-{topic}.md` (date `YYYY-MM-DD`, `{nn}` = per-day creation sequence starting at `01`; e.g. `2026-08-03-01-cross-replay-result.md`):
 
 ```markdown
 # Review #{sequence}: {Title}
@@ -138,11 +138,11 @@ After writing the report, present a **concise analytical summary** to the user:
 
 ## Important Notes
 
-- **File locations (fixed convention)**:
-  - Pro responses: `docs/reviews/response/`
-  - Review digests: `docs/reviews/{topic}-{seq}.md`
+- **File locations (fixed convention)**: all filenames start with `{date}-{nn}-` (date `YYYY-MM-DD`, `{nn}` = per-day creation sequence from `01`):
+  - Pro responses: `docs/reviews/response/{date}-{nn}-{topic}-review-response.md`
+  - Review digests: `docs/reviews/{date}-{nn}-{topic}.md`
   - Request docs & archives: `docs/reviews/request/`
-- **Sequence numbering**: Check existing files in `docs/reviews/` to determine the next sequence number.
+- **Sequence numbering**: `{nn}` orders files created the same day in the same directory — check existing files with today's date prefix to pick the next number.
 - **Past lessons matter**: If a suggestion resembles something tried before, flag it with what happened.
 - **Model comparison**: For prompt changes, use the relevant project's per-model evidence; identify missing validation without asserting universal instability.
 - **Be honest**: If you think Pro's direction is wrong, say so and explain why. "Accept unless baseless" means accept valid analysis, not blindly follow every suggestion.
