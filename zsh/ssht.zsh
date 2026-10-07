@@ -1,7 +1,8 @@
 # ssht: SSH directly into a remote tmux session.
 
 _ssht_usage() {
-    print -u2 "usage: ssht [ssh-options] <host> [session]"
+    print -u2 "usage: ssht                (local tmux session chooser)"
+    print -u2 "       ssht [ssh-options] <host> [session]"
     print -u2 "       ssht [ssh-options] <host> (-n|--new) <session>"
 }
 
@@ -155,10 +156,24 @@ esac
 REMOTE_SCRIPT
 }
 
+_ssht_local() {
+    if ! (( $+commands[tmux] )); then
+        print -u2 "ssht: tmux not found"
+        return 127
+    fi
+    if [[ -n "${TMUX:-}" ]]; then
+        command tmux choose-tree -Zs
+    elif command tmux has-session 2>/dev/null; then
+        command tmux attach-session \; choose-tree -Zs
+    else
+        command tmux new-session
+    fi
+}
+
 ssht() {
     if (( $# == 0 )); then
-        _ssht_usage
-        return 2
+        _ssht_local
+        return
     fi
 
     local host="" mode=default session=""

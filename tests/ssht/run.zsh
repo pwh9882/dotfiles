@@ -101,3 +101,16 @@ mapfile=("${(f)$(<"$tmpdir/ssh-log")}")
 [[ ${mapfile[1]} == -t && ${mapfile[2]} == -p && ${mapfile[3]} == 33022 && ${mapfile[4]} == ts-ddps ]] || fail 'ssh arguments preserved'
 assert_contains "${mapfile[5]}" ' ssht new ADRS'
 print 'ok - SSH options remain before host and ssht options remain after host'
+
+for case_name in outside-with-sessions outside-without-sessions inside; do
+    rm -f "$tmpdir/log"
+    case $case_name in
+        outside-with-sessions) expected='attach-session ; choose-tree -Zs'; has=1; inside_tmux= ;;
+        outside-without-sessions) expected='new-session'; has=0; inside_tmux= ;;
+        inside) expected='choose-tree -Zs'; has=1; inside_tmux=/tmp/fake,1,0 ;;
+    esac
+    SSHT_TMUX_LOG="$tmpdir/log" SSHT_HAS_SESSIONS=$has TMUX=$inside_tmux PATH="$tmpdir/bin:$PATH" \
+        zsh -fc 'source "$1"; ssht' ssht "$ROOT/zsh/ssht.zsh"
+    [[ "$(<"$tmpdir/log")" == "$expected" ]] || fail "local mode $case_name"
+done
+print 'ok - bare ssht opens the local session chooser (attach, create, or in-tmux)'
