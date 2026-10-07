@@ -11,7 +11,7 @@
 # the MacBook's rename-thread or ddps-srv-2's codex-usage-guard) stays a real
 # directory under the harness and is left alone.
 DF_SKILLS_BOTH="pro-prepare pro-verify codex-queue"
-DF_SKILLS_CLAUDE_ONLY="codex weekly-report"
+DF_SKILLS_CLAUDE_ONLY="codex weekly-report paper-seminar"
 DF_SKILLS_CODEX_ONLY="claude"
 
 df_agents_skill_links() {
