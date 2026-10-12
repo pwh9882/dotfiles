@@ -431,6 +431,12 @@ bind-key S-Right swap-window -t +1\; select-window -t +1
 # force Vi mode (y로 복사 등 vi 키바인딩 활성화)
 set -g mode-keys vi
 
+# tmux 3.8+: vi copy mode Shift+R toggles live refresh; r refreshes once.
+# Keep emacs R (rectangle selection) unchanged.
+%if #{>=:#{version},3.8}
+bind -T copy-mode-vi R send-keys -X refresh-toggle #!important
+%endif
+
 # disable secondary prefix so only C-b is used
 set -gu prefix2 #!important
 unbind C-a #!important
