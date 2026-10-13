@@ -4,6 +4,44 @@
             "complex_modifications": {
                 "rules": [
                     {
+                        "description": "Korean grave → backtick outside WezTerm (WezTerm sends literal text directly)",
+                        "manipulators": [
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "grave_accent_and_tilde",
+                                    "modifiers": {
+                                        "optional": []
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "grave_accent_and_tilde",
+                                        "modifiers": [
+                                            "option"
+                                        ]
+                                    }
+                                ],
+                                "conditions": [
+                                    {
+                                        "type": "input_source_if",
+                                        "input_sources": [
+                                            {
+                                                "language": "ko"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "frontmost_application_unless",
+                                        "bundle_identifiers": [
+                                            "^com\\.github\\.wez\\.wezterm$"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
                         "description": "Right Option to Ctrl+A for WezTerm",
                         "manipulators": [
                             {
@@ -634,6 +672,44 @@
         {
             "complex_modifications": {
                 "rules": [
+                    {
+                        "description": "Korean grave → backtick outside WezTerm (WezTerm sends literal text directly)",
+                        "manipulators": [
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "grave_accent_and_tilde",
+                                    "modifiers": {
+                                        "optional": []
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "grave_accent_and_tilde",
+                                        "modifiers": [
+                                            "option"
+                                        ]
+                                    }
+                                ],
+                                "conditions": [
+                                    {
+                                        "type": "input_source_if",
+                                        "input_sources": [
+                                            {
+                                                "language": "ko"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "frontmost_application_unless",
+                                        "bundle_identifiers": [
+                                            "^com\\.github\\.wez\\.wezterm$"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
                     {
                         "description": "Right Option to Ctrl+A for WezTerm",
                         "manipulators": [
