@@ -4,6 +4,7 @@
 # Runtime / application-generated
 .config/iterm2/
 .config/karabiner/automatic_backups/
+.config/karabiner/assets/
 .config/wezterm/wezterm.lua.backup
 .config/wezterm/project_history.txt
 .config/wezterm/machine/local.lua
