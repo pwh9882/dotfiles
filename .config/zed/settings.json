@@ -1,6 +1,18 @@
 // Shared Zed settings. Machine-specific SSH connections stay in the local
 // Zed settings store and are not committed to this public repository.
 {
+  "project_panel": {
+    "dock": "left"
+  },
+  "outline_panel": {
+    "dock": "left"
+  },
+  "collaboration_panel": {
+    "dock": "left"
+  },
+  "git_panel": {
+    "dock": "left"
+  },
   "agent_servers": {
     "codex": {
       "command": "codex",
@@ -15,6 +27,7 @@
   },
   "icon_theme": "Catppuccin Latte",
   "agent": {
+    "dock": "right",
     "profiles": {
       "test": {
         "name": "test",
