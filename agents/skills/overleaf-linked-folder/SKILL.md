@@ -1,6 +1,6 @@
 ---
 name: overleaf-linked-folder
-description: Rules for editing a paper in a local folder that the Overleaf Workshop VS Code extension keeps in sync with an Overleaf project (the folder contains .overleaf/settings.json), including how edits become suggestions the user reviews, how to answer Overleaf review comments through drafts, how to explain edits, how to see which suggestions were accepted, and where compile errors are. Use when editing .tex or .bib files in such a folder, or when asked to check, answer, resolve or move Overleaf comments, explain changes, or fix LaTeX compile errors there ("코멘트 확인해줘", "코멘트에 답글", "컴파일 오류 고쳐줘").
+description: Rules for editing a paper in a local folder that the Overleaf Workshop VS Code extension keeps in sync with an Overleaf project (the folder contains .overleaf/settings.json), including how edits become suggestions the user reviews, how to answer Overleaf review comments through drafts, how to explain edits, how to see which suggestions were accepted, and where compile errors are. Use when editing .tex or .bib files in such a folder, or when asked to check, answer, resolve or move Overleaf comments, explain changes, fix LaTeX compile errors or layout problems, or work on what the user is looking at or has selected there ("코멘트 확인해줘", "코멘트에 답글", "컴파일 오류 고쳐줘", "지금 보는 문단", "선택한 문장").
 ---
 
 # Overleaf linked folder
@@ -28,6 +28,14 @@ differs from this skill.
   rename files in Overleaf.
 - Do not edit other files under `.overleaf/`, do not save Overleaf editor tabs in VS Code,
   and do not build the PDF in a shell; Overleaf compiles it.
+
+## What the user is looking at
+
+You cannot see VS Code. `.overleaf/editor.md` says which document of the project the user
+is working in, the visible lines, the cursor line and the selected text, with line numbers
+of this folder's files. Read it when the user says "this paragraph", "here", "the selected
+sentence" or similar. If it says the user is in another view, it describes the document
+they worked in last.
 
 ## Explaining an edit
 
@@ -72,14 +80,15 @@ write one JSON draft per action into `.overleaf/review/drafts/`:
 To address a comment by changing the text, edit the file (it becomes a suggestion), add a
 note, and draft a reply that says what you changed.
 
-## Compile errors
+## Compile errors and the PDF
 
-After each compile, `.overleaf/build/errors.md` lists the LaTeX errors and warnings by file
-and line, and `.overleaf/build/output.log` holds the full log. Check the time at its top:
-it describes the last compile, which the user starts (Cmd/Ctrl+S in an Overleaf tab).
-Line numbers refer to the text Overleaf compiled, which differs from your file where
-suggestions are not accepted yet. Fix errors in the source files; ask the user to compile
-again to confirm.
+After each compile, `.overleaf/build/errors.md` lists the LaTeX errors, warnings and layout
+problems by file and line; an overfull `\hbox` is a line that runs into the margin, widest
+first. `.overleaf/build/output.pdf` is the compiled PDF and `.overleaf/build/output.log`
+the full log. Check the time at the top of `errors.md`: it describes the last compile,
+which the user starts (Cmd/Ctrl+S in an Overleaf tab). Line numbers refer to the text
+Overleaf compiled, which differs from your file where suggestions are not accepted yet.
+Fix problems in the source files and ask the user to compile again to confirm.
 
 ## Git
 
