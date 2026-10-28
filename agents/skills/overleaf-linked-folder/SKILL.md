@@ -1,6 +1,6 @@
 ---
 name: overleaf-linked-folder
-description: Rules for editing a paper in a local folder that the Overleaf Workshop VS Code extension keeps in sync with an Overleaf project (the folder contains .overleaf/settings.json), including how edits become suggestions the user reviews, how to answer Overleaf review comments through drafts, how to explain edits, how to see which suggestions were accepted, and where compile errors are. Use when editing .tex or .bib files in such a folder, or when asked to check, answer, resolve or move Overleaf comments, explain changes, fix LaTeX compile errors or layout problems, or work on what the user is looking at or has selected there ("코멘트 확인해줘", "코멘트에 답글", "컴파일 오류 고쳐줘", "지금 보는 문단", "선택한 문장").
+description: Rules for editing a paper in a local folder that the Overleaf Workshop VS Code extension keeps in sync with an Overleaf project (the folder contains .overleaf/settings.json), including how edits become suggestions the user reviews, how to answer Overleaf review comments through drafts, how to explain edits, how to see which suggestions were accepted, and where compile errors are. Use when editing .tex or .bib files in such a folder, or when asked to check, answer, resolve or move Overleaf comments, explain changes, fix LaTeX compile errors or layout problems, address the user's feedback on suggestions, or work on what the user is looking at or has selected there ("코멘트 확인해줘", "코멘트에 답글", "피드백 반영해줘", "컴파일 오류 고쳐줘", "지금 보는 문단", "선택한 문장").
 ---
 
 # Overleaf linked folder
@@ -26,6 +26,10 @@ differs from this skill.
   text, and your version is kept in `.overleaf/conflicts/`.
 - New files, renames, deletions and images are not uploaded. Ask the user to create or
   rename files in Overleaf.
+- A read-only file, such as a .bib linked from another Overleaf project, is a copy of a
+  file Overleaf keeps as a file rather than a document. Read it (for example for citation
+  keys), but do not edit it: the extension restores it. To change one, edit it in its
+  source project and ask the user to refresh it (Refresh Linked Files).
 - Do not edit other files under `.overleaf/`, do not save Overleaf editor tabs in VS Code,
   and do not build the PDF in a shell; Overleaf compiles it.
 
@@ -46,8 +50,17 @@ Write one JSON file per note into `.overleaf/review/notes/` (any name ending in 
 ```
 
 `file` is the path in this folder. `quote` must appear in the new text of that suggestion
-(spaces and line breaks are ignored). The user sees the note with the suggestion. When
-they decide, the note moves to `.overleaf/review/done/`.
+(spaces and line breaks are ignored). The user reads the note as your reason when pointing
+at the suggestion. When they decide, the note moves to `.overleaf/review/done/`.
+
+## The user's feedback on your suggestions
+
+The user can comment on a suggestion, and can also edit it before accepting, so your file
+may contain the user's changes to your text. `.overleaf/review/feedback.md` lists the open
+comments by file and line of this folder's files. Address one by revising the suggestion
+(edit the file again) and write a note saying what you changed. A comment closes when the
+user resolves it or accepts or rejects the suggestion; `suggestions.md` then records the
+comments with the result.
 
 ## Results of your suggestions
 
