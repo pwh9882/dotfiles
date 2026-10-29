@@ -16,7 +16,8 @@ differs from this skill.
 - Edit existing `.tex` and `.bib` files in place. Nothing you write reaches Overleaf by
   itself: each paragraph you change is shown to the user as a suggestion, and only the
   ones they accept are applied (in explicit mode, they are merged into the user's unsaved
-  Overleaf tab and uploaded when the user saves it).
+  Overleaf tab and uploaded when the user saves it). If the user enabled
+  `agentEdits.autoAccept`, suggestions may be accepted automatically.
 - Read a file again right before editing it. Co-author edits and accepted suggestions
   change the file at any time.
 - Change only the paragraphs the task needs. Do not reflow, rewrap or reformat other
@@ -31,19 +32,28 @@ differs from this skill.
   keys), but do not edit it: the extension restores it. To change one, edit it in its
   source project and ask the user to refresh it (Refresh Linked Files).
 - Do not edit other files under `.overleaf/`, do not save Overleaf editor tabs in VS Code,
-  and do not build the PDF in a shell; Overleaf compiles it.
+  and do not build the PDF in a shell. Overleaf compiles accepted text; the extension
+  can separately render the version with pending suggestions.
 
 ## What the user is looking at
 
-You cannot see VS Code. `.overleaf/editor.md` says which document of the project the user
-is working in, the visible lines, the cursor line and the selected text, with line numbers
-of this folder's files. Read it when the user says "this paragraph", "here", "the selected
-sentence" or similar. If it says the user is in another view, it describes the document
-they worked in last.
+Read `.overleaf/editor.md` when the user refers to "this paragraph", "here" or a
+selection. It records the document, visible lines, cursor and selected text, with lines
+mapped to this folder's files. Check the source view (Overleaf text, agent comparison or
+local file), observation time, and whether the selection matches the current local text.
+Overleaf text can differ from your file because your suggestions are not accepted yet.
+If the text differs or moved, reread the local passage before editing; mapped lines are
+approximate. If the user is in another view, this is their last observed document.
+
+The observation time stays unchanged when only the local file changes. These files are
+last observations, not connection heartbeats; they can stay old while the extension is
+stopped. Older extension versions may omit these fields; do not infer freshness from
+absence of a mismatch warning.
 
 ## Explaining an edit
 
-Write one JSON file per note into `.overleaf/review/notes/` (any name ending in `.json`):
+When an explanation helps, write a JSON file into `.overleaf/review/notes/`
+(any name ending in `.json`):
 
 ```json
 {"file": "sections/intro.tex", "quote": "a phrase from your new text", "note": "Why you changed it"}
@@ -51,23 +61,41 @@ Write one JSON file per note into `.overleaf/review/notes/` (any name ending in 
 
 `file` is the path in this folder. `quote` must appear in the new text of that suggestion
 (spaces and line breaks are ignored). The user reads the note as your reason when pointing
-at the suggestion. When they decide, the note moves to `.overleaf/review/done/`.
+at the suggestion. Reuse the same filename when revising the same passage, updating both
+`quote` and `note`. The latest observed explanation is shown; prior observed versions go
+to `.overleaf/review/done/` with status `superseded`. Files that unambiguously match the
+same current suggestion also keep the newest explanation. Use a specific quote when
+several suggestions share the same words. `.overleaf/review/note-history/` is an
+extension-owned checkpoint; do not edit it. When the user decides, the current note
+also moves to `done/`.
 
 ## The user's feedback on your suggestions
 
-The user can comment on a suggestion, and can also edit it before accepting, so your file
-may contain the user's changes to your text. `.overleaf/review/feedback.md` lists the open
-comments by file and line of this folder's files. Address one by revising the suggestion
-(edit the file again) and write a note saying what you changed. A comment closes when the
-user resolves it or accepts or rejects the suggestion; `suggestions.md` then records the
-comments with the result.
+The user can comment on any text in the comparison's agent version and can edit it
+before accepting, so your file may contain their changes. `.overleaf/review/feedback.md`
+lists open comments by file and line, distinguishing suggestions from other text.
+Address a comment by revising the suggestion, or by editing the commented text to create
+a suggestion. Update its note when useful. A comment closes when the user resolves it
+or decides the suggestion it belongs to; a comment on other text closes with the
+suggestion that changes that text. Results link to the recorded feedback.
 
 ## Results of your suggestions
 
-`.overleaf/review/suggestions.md` lists, newest first, whether each suggestion was
-accepted, accepted automatically, rejected or withdrawn, with the text before, your text
-and your note. Read it before proposing changes to the same passage again. Do not propose
-a rejected change again unless the user asks.
+Read `.overleaf/review/suggestions.md` first. It lists the latest 40 decisions with short
+change excerpts and links to individual `results/*.json` files. Open only details
+relevant to the current task; do not read the whole archive by default. Detail files
+retain full before/after text, notes and feedback after their summaries leave the index.
+Legacy records contain only previously saved excerpts; missing text is not recoverable.
+
+- `accepted` / `accepted automatically`: the recorded proposal was applied. The after
+  text is the proposal at decision time, including user edits; it does not separately
+  identify your original proposal and the user's revision.
+- `rejected`: the user removed it. Rejection alone provides no reason; do not invent one
+  or treat a separate comment as an explicit rejection reason. Read the relevant detail
+  before proposing changes to that passage again; do not repeat a rejected change unless
+  the user asks.
+- `withdrawn`: the change overlapped newer Overleaf edits. Reread the file before editing;
+  the displaced version is retained in `.overleaf/conflicts/`.
 
 ## Overleaf review comments
 
@@ -95,13 +123,29 @@ note, and draft a reply that says what you changed.
 
 ## Compile errors and the PDF
 
-After each compile, `.overleaf/build/errors.md` lists the LaTeX errors, warnings and layout
-problems by file and line; an overfull `\hbox` is a line that runs into the margin, widest
-first. `.overleaf/build/output.pdf` is the compiled PDF and `.overleaf/build/output.log`
-the full log. Check the time at the top of `errors.md`: it describes the last compile,
-which the user starts (Cmd/Ctrl+S in an Overleaf tab). Line numbers refer to the text
-Overleaf compiled, which differs from your file where suggestions are not accepted yet.
-Fix problems in the source files and ask the user to compile again to confirm.
+After an Overleaf compile, `.overleaf/build/errors.md` lists errors, warnings and layout
+problems by file and line; `.overleaf/build/output.pdf` is its PDF and `output.log` its
+full log. Check the time at the top of `errors.md`. Overleaf may compile automatically,
+or the user can trigger it with Cmd/Ctrl+S. Its lines and PDF refer to accepted Overleaf
+text, which can differ from your file. Fix source files and confirm with a later compile.
+
+The extension can separately render pending suggestions to
+`.overleaf/render/output-with-suggestions.pdf`. Before using it to judge your latest
+edit, read `.overleaf/render/status.json`:
+
+- `current`: the PDF's recorded inputs match current inputs.
+- `rendering`: a build is running; the existing PDF may still be an older one.
+- `stale`: inputs differ from the PDF's inputs, including an edit made during rendering.
+- `failed`: the last render failed or TeX reported errors; inspect `error` and the render
+  log. Even if `pdfMatchesInputs` is true, an error PDF can be incomplete.
+- `not-rendered` / `unknown`: no rendered PDF, or freshness cannot be established.
+
+`renderedAt` is the last PDF generation and `checkedAt` the last status observation.
+Hashes cover linked document contents, read-only copies, compiler/root and remote asset
+versions. Timestamps alone do not prove freshness. Status cannot follow edits while the
+extension is stopped; an abrupt disconnect can leave an old `current` status. If the
+status file is absent, do not assume the PDF is current. Use the extension's **Render PDF
+with Suggestions** action when a new render is needed; do not compile independently.
 
 ## Git
 
