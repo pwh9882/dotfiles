@@ -123,31 +123,39 @@ note, and draft a reply that says what you changed.
 
 ## Figure assets
 
-Create figures in the linked folder. To request upload, write one file in
-`.overleaf/assets/requests/`, for example `result.json`:
+Upload only when the user explicitly asks for the specified figures to be uploaded.
+Creating or editing a figure alone does not authorize upload. An existing explicit
+instruction remains sufficient: do not ask for another Review click or repeat approval
+just because an upload request needs to be rewritten or retried within the same scope.
+
+Compute the intended file's SHA-256 and write a uniquely named JSON execution request
+under `.overleaf/assets/requests/`:
 
 ```json
-{"action":"upload","file":"figures/result.pdf"}
+{"action":"upload","file":"figures/result.pdf","sha256":"<SHA256 of the file bytes>"}
 ```
 
-The path is relative to the linked folder. Supported files are PDF, PNG, JPEG, SVG, EPS
-and WebP, up to 20 MiB. The user runs **Review Figure Upload Requests** and confirms the
-file and destination. Writing a request never uploads it automatically. Do not invoke
-upload APIs yourself or treat an agent request as user approval.
+The extension processes hash-pinned requests automatically while connected. No VS Code
+Review action is needed. The hash pins bytes; it is not proof of permission. The agent
+is responsible for acting only on the user's explicit upload instruction. Paths are
+relative to the linked folder; supported files are PDF, PNG, JPEG, SVG, EPS and WebP up
+to 20 MiB. Old requests without sha256 remain manual drafts; replace one with this
+format when the corresponding upload has already been requested by the user.
 
-Read `.overleaf/assets/status.md` and the completed receipt in `assets/done/`. Uploads
-create `figures/<stem>-<SHA256>.<ext>` revisions and verify their contents; they do not
-replace prior versions. Only after success, use the exact returned `remote` path in a
-separate `\includegraphics` text suggestion. Do not assume the local source filename
-was uploaded. Reuse the local source for later versions and submit another request.
+Read the receipt in `.overleaf/assets/done/` and `.overleaf/assets/status.md`. Success
+contains `result.remote`, the verified `figures/<stem>-<SHA256>.<ext>` path. Use that exact
+path in a separate includegraphics text suggestion; do not assume the original local
+filename was uploaded. On failure inspect `result.error` and the intended current file
+before a new request. There is no automatic retry loop. Interrupted claims remain in
+`processing/`; check for an existing result before resubmitting. Do not report success
+just because a request file was written or disappeared.
 
-Other connected folders download Overleaf's `figures/` images. Local edits are not sent
-back automatically; if local and remote changed, both copies are retained and status
-reports a conflict. Inspect `assets/conflicts/` and its metadata when needed, but do not
-delete or edit the index to force a result. Remote deletion does not remove local copies.
-The user can run **Refresh Figure Assets from Overleaf** for a forced content check.
-Older extensions may lack this workflow; follow the project's review README and do not
-claim upload succeeded until a receipt or verified status exists.
+Other connected folders download Overleaf's figures. Local edits are not sent back
+automatically; local/remote conflicts retain both copies. Inspect `assets/conflicts/`
+and its metadata when needed; do not edit index.json or remove conflicts to force a
+result. Remote deletion does not remove local copies. Refresh Figure Assets from
+Overleaf forces a content check. Follow the project's review README for older versions;
+if it still requires Review, the extension needs the new automatic-request version.
 
 ## Compile errors and the PDF
 
