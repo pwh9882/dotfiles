@@ -1,6 +1,6 @@
 ---
 name: overleaf-linked-folder
-description: Rules for editing a paper in a local folder that the Overleaf Workshop VS Code extension keeps in sync with an Overleaf project (the folder contains .overleaf/settings.json), including how edits become suggestions the user reviews, how to answer Overleaf review comments through drafts, how to explain edits, how to see which suggestions were accepted, and where compile errors are. Use when editing .tex or .bib files in such a folder, or when asked to check, answer, resolve or move Overleaf comments, explain changes, fix LaTeX compile errors or layout problems, address the user's feedback on suggestions, or work on what the user is looking at or has selected there ("코멘트 확인해줘", "코멘트에 답글", "피드백 반영해줘", "컴파일 오류 고쳐줘", "지금 보는 문단", "선택한 문장").
+description: Rules for editing a paper in a local folder that the Overleaf Workshop VS Code extension keeps in sync with an Overleaf project (the folder contains .overleaf/settings.json), including how edits become suggestions the user reviews, how to answer Overleaf review comments through drafts, how to explain edits, how to see which suggestions were accepted, where compile errors are, and how to request figure uploads. Use when editing .tex or .bib files in such a folder, or when asked to check, answer, resolve or move Overleaf comments, explain changes, fix LaTeX compile errors or layout problems, address the user's feedback on suggestions, request figure uploads, or work on what the user is looking at or has selected there ("코멘트 확인해줘", "코멘트에 답글", "피드백 반영해줘", "컴파일 오류 고쳐줘", "지금 보는 문단", "선택한 문장").
 ---
 
 # Overleaf linked folder
@@ -25,8 +25,8 @@ differs from this skill.
 - A rejected suggestion disappears from your file. If someone edits the same words on
   Overleaf first, your suggestion for that paragraph is withdrawn, the file shows their
   text, and your version is kept in `.overleaf/conflicts/`.
-- New files, renames, deletions and images are not uploaded. Ask the user to create or
-  rename files in Overleaf.
+- New text files, renames and deletions are not mirrored. Ask the user to create or
+  rename text files in Overleaf. Images use the reviewed figure-upload workflow below.
 - A read-only file, such as a .bib linked from another Overleaf project, is a copy of a
   file Overleaf keeps as a file rather than a document. Read it (for example for citation
   keys), but do not edit it: the extension restores it. To change one, edit it in its
@@ -121,6 +121,34 @@ write one JSON draft per action into `.overleaf/review/drafts/`:
 To address a comment by changing the text, edit the file (it becomes a suggestion), add a
 note, and draft a reply that says what you changed.
 
+## Figure assets
+
+Create figures in the linked folder. To request upload, write one file in
+`.overleaf/assets/requests/`, for example `result.json`:
+
+```json
+{"action":"upload","file":"figures/result.pdf"}
+```
+
+The path is relative to the linked folder. Supported files are PDF, PNG, JPEG, SVG, EPS
+and WebP, up to 20 MiB. The user runs **Review Figure Upload Requests** and confirms the
+file and destination. Writing a request never uploads it automatically. Do not invoke
+upload APIs yourself or treat an agent request as user approval.
+
+Read `.overleaf/assets/status.md` and the completed receipt in `assets/done/`. Uploads
+create `figures/<stem>-<SHA256>.<ext>` revisions and verify their contents; they do not
+replace prior versions. Only after success, use the exact returned `remote` path in a
+separate `\includegraphics` text suggestion. Do not assume the local source filename
+was uploaded. Reuse the local source for later versions and submit another request.
+
+Other connected folders download Overleaf's `figures/` images. Local edits are not sent
+back automatically; if local and remote changed, both copies are retained and status
+reports a conflict. Inspect `assets/conflicts/` and its metadata when needed, but do not
+delete or edit the index to force a result. Remote deletion does not remove local copies.
+The user can run **Refresh Figure Assets from Overleaf** for a forced content check.
+Older extensions may lack this workflow; follow the project's review README and do not
+claim upload succeeded until a receipt or verified status exists.
+
 ## Compile errors and the PDF
 
 After an Overleaf compile, `.overleaf/build/errors.md` lists errors, warnings and layout
@@ -137,10 +165,14 @@ edit, read `.overleaf/render/status.json`:
 - `rendering`: a build is running; the existing PDF may still be an older one.
 - `stale`: inputs differ from the PDF's inputs, including an edit made during rendering.
 - `failed`: the last render failed or TeX reported errors; inspect `error` and the render
-  log. Even if `pdfMatchesInputs` is true, an error PDF can be incomplete.
+  log path recorded in status. Current extensions retain the previous validated PDF
+  on failure; older versions could have published incomplete error PDFs.
 - `not-rendered` / `unknown`: no rendered PDF, or freshness cannot be established.
 
-`renderedAt` is the last PDF generation and `checkedAt` the last status observation.
+`renderHost` identifies the linked-folder host, which is the SSH host in Remote-SSH.
+`current.json` identifies a matching PDF/source/SyncTeX generation in `render/runs/`;
+those files and the build lock are extension-owned. Multiple windows share that build
+coordination. `renderedAt` is the last PDF generation and `checkedAt` the last observation.
 Hashes cover linked document contents, read-only copies, compiler/root and remote asset
 versions. Timestamps alone do not prove freshness. Status cannot follow edits while the
 extension is stopped; an abrupt disconnect can leave an old `current` status. If the
