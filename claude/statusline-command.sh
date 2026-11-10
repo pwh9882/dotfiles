@@ -6,7 +6,8 @@
 #   L1  Claude:  <model> <1M badge> <effort> <✻thinking> <⚡fast> │ ctx <%> │
 #                <rate limits…> │ v<version>
 #   L2  Repo:    <branch> <git status> <#PR> │ <os> in <path>
-#   L3  Session: ✎ <session name | uuid> │ ↑ <uptime> │ +<added>/-<removed this session>
+#   L3  Session: ✎ <session name | uuid> │ ↑ <uptime> │ +<added>/-<removed this session> │
+#                <account email> <plan> [@ <org, when not the personal default>]
 #   L4  Prompt:  the last user prompt (dim), width-truncated
 #
 # ── Rate limits — needs decoding ──────────────────────────────────────────────
@@ -20,6 +21,8 @@
 #             red    spending too fast — will run dry well before reset
 #           pace(): green if  qrem×window ≥ 100×time_left ;  yellow if ≥ 50× ;  else red.
 #     %     quota left (100 − used):  green plenty · yellow ~half · red almost gone.
+#   F (yellow) = Fable's own weekly bucket, same <time> <%> encoding; fetched from
+#   /api/oauth/usage (not in the statusline JSON), hidden when unavailable.
 #   Read together: "⟳ 5m 10%" = quota nearly spent (red %) BUT resets in 5m (green time),
 #   so it's fine; "⟳ 7d 10%" (both red) = heavily spent with a whole week still to go.
 #
@@ -135,6 +138,65 @@ pace_color() {
     if   [ $(( qrem * wdur )) -ge $(( 100 * trem )) ]; then printf '%b' "$GREEN"
     elif [ $(( qrem * wdur )) -ge $(( 50 * trem )) ];  then printf '%b' "$YELLOW"
     else printf '%b' "$RED"; fi
+}
+
+# --- Model-scoped weekly limits (e.g. Fable) ---
+# Not part of the statusline JSON; read from the undocumented /api/oauth/usage
+# (`limits[]` kind=weekly_scoped, scope.model.display_name), the same source /usage uses. Refreshed in the background at
+# most once per 60s so rendering never waits on the network; any failure just
+# hides the segment. Token: macOS Keychain, else ~/.claude/.credentials.json (Linux).
+USAGE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/claude-statusline"
+USAGE_CACHE="${USAGE_DIR}/usage.json"     # last good response
+USAGE_STAMP="${USAGE_DIR}/usage.stamp"    # mtime = last fetch attempt (throttle)
+
+oauth_token() {
+    local creds=""
+    if command -v security > /dev/null 2>&1; then
+        creds=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null)
+    fi
+    if [ -z "$creds" ] && [ -r "$HOME/.claude/.credentials.json" ]; then
+        creds=$(cat "$HOME/.claude/.credentials.json" 2>/dev/null)
+    fi
+    printf '%s' "$creds" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null
+}
+
+fetch_usage() {
+    local tok tmp
+    tok=$(oauth_token)
+    [ -n "$tok" ] || return
+    tmp="${USAGE_CACHE}.$$"
+    if curl -sf --max-time 5 \
+            -H "Authorization: Bearer ${tok}" \
+            -H "anthropic-beta: oauth-2025-04-20" \
+            -H "Content-Type: application/json" \
+            "https://api.anthropic.com/api/oauth/usage" -o "$tmp" \
+       && jq -e 'type == "object"' "$tmp" > /dev/null 2>&1; then
+        mv -f "$tmp" "$USAGE_CACHE"
+    else
+        rm -f "$tmp"
+    fi
+}
+
+if command -v curl > /dev/null 2>&1 && mkdir -p "$USAGE_DIR" 2>/dev/null; then
+    if [ ! -f "$USAGE_STAMP" ] || [ "$(file_age "$USAGE_STAMP")" -gt 60 ]; then
+        touch "$USAGE_STAMP"
+        ( fetch_usage ) > /dev/null 2>&1 < /dev/null &
+        disown 2>/dev/null
+    fi
+fi
+
+# Emits "<used%> <resets_at epoch>" for the named bucket when the cache is fresh (<15m).
+model_scoped_limit() {
+    [ -f "$USAGE_CACHE" ] && [ "$(file_age "$USAGE_CACHE")" -le 900 ] || return
+    jq -r --arg n "$1" '
+        def epoch: if type == "number" then floor
+                   else sub("\\.[0-9]+"; "") | sub("(\\+00:00|Z)$"; "Z") | fromdateiso8601 end;
+        [ ((.limits // [])[] | select(.kind == "weekly_scoped" and .scope.model.display_name == $n)
+             | {p: .percent, r: .resets_at}),
+          ((.model_scoped // [])[] | select(.display_name == $n) | {p: .utilization, r: .resets_at}) ]
+        | map(select(.p != null)) | .[0] // empty
+        | "\(.p | floor) \(.r | if . == null then 0 else epoch end)"
+    ' "$USAGE_CACHE" 2>/dev/null | head -1
 }
 
 # --- OS icon ---
@@ -271,6 +333,16 @@ RL7_INT=${RL7_PCT%.*}
 if [ "${RL7_INT:--1}" -ge 0 ]; then
     L1_SEGS+=("${MAUVE}⟳${RESET} $(pace_color "$RL7_INT" "$RL7_RESET" 604800)$(fmt_until "$RL7_RESET")${RESET} $(pct_color "$RL7_INT")$(( 100 - RL7_INT ))%${RESET}")
 fi
+# Fable weekly bucket: same shape as the 7d window, labelled since ⟳ colors are taken.
+read -r FB_PCT FB_RESET <<< "$(model_scoped_limit Fable)"
+if [ -n "$FB_PCT" ] && [ "$FB_PCT" -ge 0 ] 2>/dev/null; then
+    [ "$FB_PCT" -gt 100 ] && FB_PCT=100
+    if [ "${FB_RESET:-0}" -gt 0 ]; then
+        L1_SEGS+=("${YELLOW}F${RESET} $(pace_color "$FB_PCT" "$FB_RESET" 604800)$(fmt_until "$FB_RESET")${RESET} $(pct_color "$FB_PCT")$(( 100 - FB_PCT ))%${RESET}")
+    else
+        L1_SEGS+=("${YELLOW}F${RESET} $(pct_color "$FB_PCT")$(( 100 - FB_PCT ))%${RESET}")
+    fi
+fi
 [ -n "$VERSION" ] && L1_SEGS+=("${OVERLAY}v${VERSION}${RESET}")
 
 L1="$MODEL_SEG"
@@ -292,8 +364,29 @@ SESS="${OVERLAY}↑ $(fmt_dur "$DUR_MS")${RESET}"
 if [ "${LINES_ADD:-0}" -gt 0 ] || [ "${LINES_DEL:-0}" -gt 0 ]; then
     SESS="${SESS} ${SEP} ${GREEN}+${LINES_ADD}${RESET}/${RED}-${LINES_DEL}${RESET}"
 fi
+# Signed-in account: <email> <plan> [@ <org>] from the cached profile in .claude.json.
+# The org is shown only when it isn't the personal default "<email>'s Organization".
+ACCT_FILE="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
+ACCT_LEN=0
+if [ -r "$ACCT_FILE" ]; then
+    IFS=$'\t' read -r ACCT_EMAIL ACCT_PLAN ACCT_ORG < <(jq -r '.oauthAccount // {} |
+        [.emailAddress // "", .planDisplayName // "", .organizationName // ""] | @tsv' "$ACCT_FILE" 2>/dev/null)
+    if [ -n "$ACCT_EMAIL" ]; then
+        ACCT_TXT="$ACCT_EMAIL"
+        ACCT_SEG="${OVERLAY}${ACCT_EMAIL}${RESET}"
+        if [ -n "$ACCT_PLAN" ]; then
+            ACCT_TXT="${ACCT_TXT} ${ACCT_PLAN}"; ACCT_SEG="${ACCT_SEG} ${MAUVE}${ACCT_PLAN}${RESET}"
+        fi
+        if [ -n "$ACCT_ORG" ] && [ "$ACCT_ORG" != "${ACCT_EMAIL}'s Organization" ]; then
+            ACCT_TXT="${ACCT_TXT} @ ${ACCT_ORG}"; ACCT_SEG="${ACCT_SEG} ${OVERLAY}@${RESET} ${LAVENDER}${ACCT_ORG}${RESET}"
+        fi
+        SESS="${SESS} ${SEP} ${ACCT_SEG}"
+        ACCT_LEN=$(( ${#ACCT_TXT} + 3 ))
+    fi
+fi
 if [ -n "$SESSION_NAME" ]; then
-    printf '%b\n' "${LAVENDER}✎ $(truncate "$SESSION_NAME" "$((MAX_WIDTH - 22))")${RESET} ${SEP} ${SESS}"
+    NAME_MAX=$(( MAX_WIDTH - 22 - ACCT_LEN )); [ "$NAME_MAX" -lt 12 ] && NAME_MAX=12
+    printf '%b\n' "${LAVENDER}✎ $(truncate "$SESSION_NAME" "$NAME_MAX")${RESET} ${SEP} ${SESS}"
 else
     printf '%b\n' "${OVERLAY}${SESSION_ID}${RESET} ${SEP} ${SESS}"
 fi
