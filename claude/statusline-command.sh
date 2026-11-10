@@ -157,7 +157,10 @@ oauth_token() {
     if [ -z "$creds" ] && [ -r "$HOME/.claude/.credentials.json" ]; then
         creds=$(cat "$HOME/.claude/.credentials.json" 2>/dev/null)
     fi
-    printf '%s' "$creds" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null
+    # Skip expired tokens (only Claude Code itself refreshes them); expiresAt is epoch ms.
+    printf '%s' "$creds" | jq -r --argjson now "$(date +%s)" '.claudeAiOauth
+        | select(.accessToken != null and ((.expiresAt // 0) == 0 or .expiresAt / 1000 > $now))
+        | .accessToken' 2>/dev/null
 }
 
 fetch_usage() {
@@ -369,8 +372,9 @@ fi
 ACCT_FILE="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
 ACCT_LEN=0
 if [ -r "$ACCT_FILE" ]; then
-    IFS=$'\t' read -r ACCT_EMAIL ACCT_PLAN ACCT_ORG < <(jq -r '.oauthAccount // {} |
-        [.emailAddress // "", .planDisplayName // "", .organizationName // ""] | @tsv' "$ACCT_FILE" 2>/dev/null)
+    # \x1f separator: a whitespace IFS (tab) would collapse an empty plan and shift the org.
+    IFS=$'\x1f' read -r ACCT_EMAIL ACCT_PLAN ACCT_ORG < <(jq -r '.oauthAccount // {} |
+        [.emailAddress // "", .planDisplayName // "", .organizationName // ""] | join("\u001f")' "$ACCT_FILE" 2>/dev/null)
     if [ -n "$ACCT_EMAIL" ]; then
         ACCT_TXT="$ACCT_EMAIL"
         ACCT_SEG="${OVERLAY}${ACCT_EMAIL}${RESET}"
