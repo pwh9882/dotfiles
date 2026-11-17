@@ -1,6 +1,6 @@
 ---
 name: overleaf-linked-folder
-description: Rules for editing a paper in a local folder that the Overleaf Workshop VS Code extension keeps in sync with an Overleaf project (the folder contains .overleaf/settings.json), including how edits become suggestions the user reviews, how to answer Overleaf review comments through drafts, how to explain edits, how to see which suggestions were accepted, where compile errors are, how to request figure uploads, and how to deliver paragraph translations for the translation view. Use when editing .tex or .bib files in such a folder, or when asked to check, answer, resolve or move Overleaf comments, explain changes, fix LaTeX compile errors or layout problems, address the user's feedback on suggestions, request figure uploads, translate paragraphs, or work on what the user is looking at or has selected there ("코멘트 확인해줘", "코멘트에 답글", "피드백 반영해줘", "컴파일 오류 고쳐줘", "이 문단 번역해줘", "요청한 문단 번역해줘", "지금 보는 문단", "선택한 문장").
+description: Rules for editing a paper in a local folder that the Overleaf Workshop VS Code extension keeps in sync with an Overleaf project (the folder contains .overleaf/settings.json), including how edits become suggestions the user reviews, how to answer Overleaf review comments through drafts, how to explain edits, how to see which suggestions were accepted, where compile errors are, how to request figure uploads, and how to deliver translations for the translation view. Use when editing .tex or .bib files in such a folder, or when asked to check, answer, resolve or move Overleaf comments, explain changes, fix LaTeX compile errors or layout problems, address the user's feedback on suggestions, request figure uploads, translate paragraphs, or work on what the user is looking at or has selected there ("코멘트 확인해줘", "코멘트에 답글", "피드백 반영해줘", "컴파일 오류 고쳐줘", "이 문단 번역해줘", "요청한 문단 번역해줘", "지금 보는 문단", "선택한 문장").
 ---
 
 # Overleaf linked folder
@@ -123,45 +123,41 @@ note, and draft a reply that says what you changed.
 
 ## Translations
 
-The user can open a translation view beside a .tex document in VS Code (the globe button
-in the editor title of its Overleaf tab). It shows each paragraph's translation next to
-the paragraph: Korean paragraphs in English, other paragraphs in Korean. You write these
-translations. `.overleaf/translation/README.md` describes the files and wins if it
-differs from this section.
+The user can open a translation view of a .tex document in VS Code (the globe button in
+the editor title of its Overleaf tab): the document itself, with each translated region
+replaced by its translation, line for line. Korean text is translated to English and other
+text to Korean. You write these translations. `.overleaf/translation/README.md` describes
+the files and formats and wins if it differs from this section.
 
-- `.overleaf/translation/status.md` lists the paragraphs the user asked you to translate,
-  the translations made from an older text of their paragraph, and the user's comments on
-  translations. Start there when the user asks you to translate the requested paragraphs.
-- `.overleaf/translation/paragraphs/<file>.md` lists each paragraph with prose of a
-  document opened in the translation view: its id, its lines in this folder's file, the
-  direction, the state of its translation and its text as Overleaf has it. For "this
-  paragraph" or a selection, find the paragraphs by the lines in `.overleaf/editor.md`;
-  when the user is in the translation view, `editor.md` names the paragraph's id. If a
-  document has no paragraphs file, ask the user to open its translation view.
+- `.overleaf/translation/status.md` lists the regions the user selected and asked you to
+  translate, each with its text as Overleaf has it and the line to start your translation
+  with, then the translations whose text changed since, and the user's comments on
+  translations. Start there when the user asks you to translate the requested regions.
 - Deliver translations by writing one file into `.overleaf/translation/inbox/` (any name
-  ending in `.tex`) at once, with a line `%%% <file> <id>` before each translation:
+  ending in `.tex`) at once, each translation after its line from `status.md`:
 
   ```
-  %%% main.tex p-1a2b3c4d
+  %%% main.tex r-1a2b3c4d 5e6f7a
   We evaluate temporal queries on serverless databases ...
-
-  %%% main.tex p-5e6f7a8b
-  서버리스 데이터베이스는 유휴 상태에서 ...
   ```
 
-- Translate the text in the paragraphs file, which is the Overleaf text; your copy of the
-  file differs where your suggestions are not accepted yet. Write one paragraph per
-  translation, without blank lines inside. Keep LaTeX commands, citations, labels,
-  references and math as they are, and translate only the prose.
+- When the user asks in chat for "this paragraph" or some lines that nobody requested,
+  find the lines in `.overleaf/editor.md` and write `%%% main.tex lines 12-14` followed by
+  the translation of those whole lines of this folder's file.
+- Translate the Overleaf text shown in `status.md`; your copy of the file differs where
+  your suggestions are not accepted yet. Give a translation as many lines as the text it
+  translates, with blank lines where the text has them. A region may be part of a line,
+  such as one sentence. Keep LaTeX commands, citations, labels, references and math as they
+  are, and translate only the prose.
 - A translation is not an edit of the paper: do not change the .tex file to deliver one.
-  The user replaces a paragraph with its translation in VS Code. Edit the file (as a
-  suggestion) only when the user asks you to put the translated text into the paper.
+  The user replaces text with its translation in VS Code. Edit the file (as a suggestion)
+  only when the user asks you to put the translated text into the paper.
 - `.overleaf/translation/done/<name>.result.json` lists the translations the extension
-  took and any errors, such as an id that is no longer a paragraph. Fix those and write a
-  new file.
+  took and any errors, such as a region that no longer exists. Fix those and write a new
+  file.
 - A comment in `status.md` is the user's request to change a translation. Answer it by
-  writing a new translation of that paragraph; the user resolves the comment.
-- Do not edit `paragraphs/`, `status.md` or `store/`.
+  writing a new translation of that region; the user resolves the comment.
+- Do not edit `status.md` or `store/`.
 
 ## Figure assets
 
