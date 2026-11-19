@@ -130,13 +130,17 @@ assert_agent_link() {
 assert_agent_links() {
   [ -d "$CASE_HOME/.claude" ] && [ ! -L "$CASE_HOME/.claude" ] || fail '.claude is not a real directory'
   [ -d "$CASE_HOME/.codex" ] && [ ! -L "$CASE_HOME/.codex" ] || fail '.codex is not a real directory'
+  [ -d "$CASE_HOME/.gemini/config/skills" ] && [ ! -L "$CASE_HOME/.gemini/config/skills" ] || fail '.gemini/config/skills is not a real directory'
   assert_agent_link "$CASE_HOME/.claude/CLAUDE.md"
   assert_agent_link "$CASE_HOME/.codex/AGENTS.md"
+  [ -L "$CASE_HOME/.gemini/config/skills/overleaf-linked-folder" ] || fail '.gemini/config/skills/overleaf-linked-folder is not a symlink'
+  assert_equal "$ROOT/agents/skills/overleaf-linked-folder" "$(readlink "$CASE_HOME/.gemini/config/skills/overleaf-linked-folder")"
 }
 
 assert_agent_paths_absent() {
   [ ! -e "$CASE_HOME/.claude" ] && [ ! -L "$CASE_HOME/.claude" ] || fail '.claude still exists'
   [ ! -e "$CASE_HOME/.codex" ] && [ ! -L "$CASE_HOME/.codex" ] || fail '.codex still exists'
+  [ ! -e "$CASE_HOME/.gemini" ] && [ ! -L "$CASE_HOME/.gemini" ] || fail '.gemini still exists'
 }
 
 find_transactions() {

@@ -13,6 +13,7 @@
 DF_SKILLS_BOTH="pro-prepare pro-verify codex-queue korean-writing overleaf-linked-folder"
 DF_SKILLS_CLAUDE_ONLY="codex weekly-report paper-seminar"
 DF_SKILLS_CODEX_ONLY="claude"
+DF_SKILLS_ANTIGRAVITY="overleaf-linked-folder"
 
 df_agents_skill_links() {
   local name
@@ -21,6 +22,9 @@ df_agents_skill_links() {
   df_dir "$HOME/.agents/skills" 0755 || return 1
   df_dir "$HOME/.claude/skills" 0755 || return 1
   df_dir "$HOME/.codex/skills" 0755 || return 1
+  df_dir "$HOME/.gemini" 0755 || return 1
+  df_dir "$HOME/.gemini/config" 0755 || return 1
+  df_dir "$HOME/.gemini/config/skills" 0755 || return 1
 
   for name in $DF_SKILLS_BOTH $DF_SKILLS_CLAUDE_ONLY $DF_SKILLS_CODEX_ONLY; do
     df_link "$DF_ROOT/agents/skills/$name" "$HOME/.agents/skills/$name" || return 1
@@ -32,6 +36,10 @@ df_agents_skill_links() {
 
   for name in $DF_SKILLS_BOTH $DF_SKILLS_CODEX_ONLY; do
     df_link "$DF_ROOT/agents/skills/$name" "$HOME/.codex/skills/$name" || return 1
+  done
+
+  for name in $DF_SKILLS_ANTIGRAVITY; do
+    df_link "$DF_ROOT/agents/skills/$name" "$HOME/.gemini/config/skills/$name" || return 1
   done
 }
 
